@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { 
   User, Phone, Mail, MapPin, Calendar, CreditCard, Shield, TrendingUp, 
-  FileText, CalendarCheck, MessageSquare, Activity, DollarSign, Plus, Eye
+  FileText, CalendarCheck, MessageSquare, Activity, DollarSign, Plus, Eye, Loader
 } from 'lucide-react';
 import { Tabs } from '../components/common/Tabs';
 import { PolicyStatusBadge } from '../components/insurance/PolicyStatusBadge';
@@ -10,6 +10,8 @@ import {
   MOCK_CUSTOMERS, MOCK_POLICIES, MOCK_MUTUAL_FUNDS, MOCK_SIPS, 
   MOCK_DOCUMENTS, MOCK_FOLLOWUPS, MOCK_ACTIVITY 
 } from '../api/mockData';
+import { apiClient } from '../api/client';
+import { useAgency } from '../context/AgencyContext';
 import { OcrReviewModal } from '../components/documents/OcrReviewModal';
 import { WhatsappPreviewModal } from '../components/whatsapp/WhatsappPreviewModal';
 
@@ -17,18 +19,51 @@ export const CustomerDetailPage = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'overview';
+  const { currentAgency } = useAgency();
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [ocrDocument, setOcrDocument] = useState(null);
   const [whatsappModal, setWhatsappModal] = useState(false);
+  const [customer, setCustomer] = useState(() => MOCK_CUSTOMERS.find(c => c.id === id) || MOCK_CUSTOMERS[0]);
+  const [loading, setLoading] = useState(false);
 
-  const customer = MOCK_CUSTOMERS.find(c => c.id === id) || MOCK_CUSTOMERS[0];
-  const policies = MOCK_POLICIES.filter(p => p.customerId === customer.id);
-  const mutualFunds = MOCK_MUTUAL_FUNDS.filter(m => m.customerId === customer.id);
-  const sips = MOCK_SIPS.filter(s => s.customerId === customer.id);
-  const documents = MOCK_DOCUMENTS.filter(d => d.customerId === customer.id);
-  const followups = MOCK_FOLLOWUPS.filter(f => f.customerId === customer.id);
-  const activity = MOCK_ACTIVITY.filter(a => a.customerId === customer.id);
+  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
+
+  useEffect(() => {
+    async function loadCustomer() {
+      if (!agencyId || !id) return;
+      setLoading(true);
+      try {
+        const res = await apiClient.get(`/agencies/${agencyId}/customers/${id}`);
+        const data = res?.data?.customer || res?.data;
+        if (data && (data._id || data.id)) {
+          setCustomer({
+            ...data,
+            id: data.id || data._id,
+            assignedAgentName: data.assignedAgentId?.name || data.assignedAgentName || 'Agent',
+            address: typeof data.address === 'object' ? `${data.address?.street || ''} ${data.address?.city || ''} ${data.address?.state || ''}`.trim() : (data.address || '—'),
+            nominees: data.nominee ? [data.nominee] : (data.nominees || [{ name: 'None Listed', relation: '—', share: 100 }]),
+            annualIncome: data.income || data.annualIncome || 0,
+            insuranceSummary: data.insuranceSummary || { activePolicies: 0, totalPremium: 0 },
+            mfSummary: data.mfSummary || { currentPortfolioValue: 0, totalInvested: 0 }
+          });
+        }
+      } catch (err) {
+        // fallback
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadCustomer();
+  }, [id, agencyId]);
+
+  const customerId = customer.id || customer._id;
+  const policies = MOCK_POLICIES.filter(p => p.customerId === customerId);
+  const mutualFunds = MOCK_MUTUAL_FUNDS.filter(m => m.customerId === customerId);
+  const sips = MOCK_SIPS.filter(s => s.customerId === customerId);
+  const documents = MOCK_DOCUMENTS.filter(d => d.customerId === customerId);
+  const followups = MOCK_FOLLOWUPS.filter(f => f.customerId === customerId);
+  const activity = MOCK_ACTIVITY.filter(a => a.customerId === customerId);
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
@@ -40,6 +75,8 @@ export const CustomerDetailPage = () => {
     { id: 'activity', label: 'Activity' },
     { id: 'financial', label: 'Financial Overview' }
   ];
+
+  const nomineesList = customer.nominees || (customer.nominee ? [customer.nominee] : []);
 
   return (
     <div>
@@ -59,17 +96,17 @@ export const CustomerDetailPage = () => {
               fontWeight: '700',
               fontSize: '22px'
             }}>
-              {customer.name.charAt(0)}
+              {customer.name?.charAt(0) || 'C'}
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <h1 style={{ fontSize: '22px', fontWeight: '700' }}>{customer.name}</h1>
-                <span className="badge badge-info">Assigned: {customer.assignedAgentName}</span>
+                <span className="badge badge-info">Assigned: {customer.assignedAgentName || 'Agent'}</span>
               </div>
               <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                 <span><Phone size={14} style={{ verticalAlign: 'middle' }} /> {customer.mobile}</span>
-                <span><Mail size={14} style={{ verticalAlign: 'middle' }} /> {customer.email}</span>
-                <span><CreditCard size={14} style={{ verticalAlign: 'middle' }} /> PAN: {customer.pan}</span>
+                <span><Mail size={14} style={{ verticalAlign: 'middle' }} /> {customer.email || '—'}</span>
+                <span><CreditCard size={14} style={{ verticalAlign: 'middle' }} /> PAN: {customer.pan || '—'}</span>
               </div>
             </div>
           </div>
@@ -89,19 +126,23 @@ export const CustomerDetailPage = () => {
           <div className="card">
             <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Personal & Family Information</h3>
             <div style={{ fontSize: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div><strong>DOB:</strong> {customer.dob}</div>
-              <div><strong>Aadhaar:</strong> {customer.aadhaar}</div>
-              <div><strong>Occupation:</strong> {customer.occupation}</div>
-              <div><strong>Annual Income:</strong> ₹ {customer.annualIncome.toLocaleString('en-IN')}</div>
-              <div><strong>Address:</strong> {customer.address}</div>
+              <div><strong>DOB:</strong> {customer.dob ? new Date(customer.dob).toLocaleDateString() : '—'}</div>
+              <div><strong>Aadhaar:</strong> {customer.aadhaar || '—'}</div>
+              <div><strong>Occupation:</strong> {customer.occupation || '—'}</div>
+              <div><strong>Annual Income:</strong> ₹ {(customer.annualIncome || customer.income || 0).toLocaleString('en-IN')}</div>
+              <div><strong>Address:</strong> {typeof customer.address === 'object' ? `${customer.address?.street || ''} ${customer.address?.city || ''}` : customer.address || '—'}</div>
             </div>
 
             <h4 style={{ fontSize: '14px', fontWeight: '600', marginTop: '16px', marginBottom: '8px' }}>Nominees</h4>
-            {customer.nominees.map((n, i) => (
-              <div key={i} style={{ fontSize: '13px', padding: '6px 10px', backgroundColor: 'var(--color-bg)', borderRadius: '4px', marginBottom: '4px' }}>
-                {n.name} ({n.relation}) — Share: {n.share}%
-              </div>
-            ))}
+            {nomineesList.length === 0 ? (
+              <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>No nominees added</div>
+            ) : (
+              nomineesList.map((n, i) => (
+                <div key={i} style={{ fontSize: '13px', padding: '6px 10px', backgroundColor: 'var(--color-bg)', borderRadius: '4px', marginBottom: '4px' }}>
+                  {n.name} ({n.relation || 'Nominee'}) {n.share ? `— Share: ${n.share}%` : ''}
+                </div>
+              ))
+            )}
           </div>
 
           <div className="card">
@@ -114,18 +155,22 @@ export const CustomerDetailPage = () => {
               <div style={{ padding: '12px', backgroundColor: 'var(--color-bg)', borderRadius: '6px' }}>
                 <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>MF Valuation</div>
                 <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-success)' }}>
-                  ₹ {customer.mfSummary.currentPortfolioValue.toLocaleString('en-IN')}
+                  ₹ {(customer.mfSummary?.currentPortfolioValue || 0).toLocaleString('en-IN')}
                 </div>
               </div>
             </div>
 
             <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Upcoming Renewals</h4>
-            {policies.map(p => (
-              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '8px', borderBottom: '1px solid var(--color-border-subtle)' }}>
-                <span>{p.company} ({p.policyNumber})</span>
-                <span style={{ fontWeight: '600', color: 'var(--color-warning)' }}>{p.renewalDate}</span>
-              </div>
-            ))}
+            {policies.length === 0 ? (
+              <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>No active policies</div>
+            ) : (
+              policies.map(p => (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '8px', borderBottom: '1px solid var(--color-border-subtle)' }}>
+                  <span>{p.company} ({p.policyNumber})</span>
+                  <span style={{ fontWeight: '600', color: 'var(--color-warning)' }}>{p.renewalDate}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -148,16 +193,20 @@ export const CustomerDetailPage = () => {
               </tr>
             </thead>
             <tbody>
-              {policies.map(p => (
-                <tr key={p.id}>
-                  <td style={{ fontWeight: '600' }}>{p.policyNumber}</td>
-                  <td>{p.company}</td>
-                  <td>{p.policyType}</td>
-                  <td>₹ {p.premium.toLocaleString('en-IN')} / {p.frequency}</td>
-                  <td>{p.renewalDate}</td>
-                  <td><PolicyStatusBadge status={p.status} /></td>
-                </tr>
-              ))}
+              {policies.length === 0 ? (
+                <tr><td colSpan="6" style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>No policies found</td></tr>
+              ) : (
+                policies.map(p => (
+                  <tr key={p.id}>
+                    <td style={{ fontWeight: '600' }}>{p.policyNumber}</td>
+                    <td>{p.company}</td>
+                    <td>{p.policyType}</td>
+                    <td>₹ {(p.premium || 0).toLocaleString('en-IN')} / {p.frequency}</td>
+                    <td>{p.renewalDate}</td>
+                    <td><PolicyStatusBadge status={p.status} /></td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -179,18 +228,22 @@ export const CustomerDetailPage = () => {
               </tr>
             </thead>
             <tbody>
-              {mutualFunds.map(m => (
-                <tr key={m.id}>
-                  <td style={{ fontWeight: '600' }}>{m.folioNumber}</td>
-                  <td>{m.amc}</td>
-                  <td>{m.schemeName}</td>
-                  <td>₹ {m.investedAmount.toLocaleString('en-IN')}</td>
-                  <td style={{ fontWeight: '700', color: 'var(--color-success)' }}>
-                    ₹ {m.currentValue.toLocaleString('en-IN')}
-                  </td>
-                  <td>₹ {m.latestNav} ({m.navDate})</td>
-                </tr>
-              ))}
+              {mutualFunds.length === 0 ? (
+                <tr><td colSpan="6" style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>No investments found</td></tr>
+              ) : (
+                mutualFunds.map(m => (
+                  <tr key={m.id}>
+                    <td style={{ fontWeight: '600' }}>{m.folioNumber}</td>
+                    <td>{m.amc}</td>
+                    <td>{m.schemeName}</td>
+                    <td>₹ {(m.investedAmount || 0).toLocaleString('en-IN')}</td>
+                    <td style={{ fontWeight: '700', color: 'var(--color-success)' }}>
+                      ₹ {(m.currentValue || 0).toLocaleString('en-IN')}
+                    </td>
+                    <td>₹ {m.latestNav} ({m.navDate})</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
 
@@ -206,15 +259,19 @@ export const CustomerDetailPage = () => {
               </tr>
             </thead>
             <tbody>
-              {sips.map(s => (
-                <tr key={s.id}>
-                  <td>{s.folioNumber}</td>
-                  <td>{s.schemeName}</td>
-                  <td style={{ fontWeight: '600' }}>₹ {s.amount.toLocaleString('en-IN')}</td>
-                  <td>{s.sipDate}th of every month</td>
-                  <td><span className="badge badge-success">{s.status}</span></td>
-                </tr>
-              ))}
+              {sips.length === 0 ? (
+                <tr><td colSpan="5" style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>No active SIPs</td></tr>
+              ) : (
+                sips.map(s => (
+                  <tr key={s.id}>
+                    <td>{s.folioNumber}</td>
+                    <td>{s.schemeName}</td>
+                    <td style={{ fontWeight: '600' }}>₹ {(s.amount || 0).toLocaleString('en-IN')}</td>
+                    <td>{s.sipDate}th of every month</td>
+                    <td><span className="badge badge-success">{s.status}</span></td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -300,11 +357,6 @@ export const CustomerDetailPage = () => {
               <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Sent Health Renewal Reminder template via wa.me link</div>
               <div style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: '4px' }}>22 Sept 2026 15:40</div>
             </div>
-            <div style={{ padding: '12px', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
-              <div style={{ fontWeight: '600', color: 'var(--color-accent)' }}>Call Note Added</div>
-              <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Customer confirmed renewal intent for HDFC Optima Secure.</div>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: '4px' }}>20 Sept 2026 11:20</div>
-            </div>
           </div>
         </div>
       )}
@@ -328,18 +380,18 @@ export const CustomerDetailPage = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
             <div style={{ padding: '16px', backgroundColor: 'var(--color-bg)', borderRadius: '8px' }}>
               <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Total Invested (Mutual Funds)</div>
-              <div style={{ fontSize: '20px', fontWeight: '700' }}>₹ {customer.mfSummary.totalInvested.toLocaleString('en-IN')}</div>
+              <div style={{ fontSize: '20px', fontWeight: '700' }}>₹ {(customer.mfSummary?.totalInvested || 0).toLocaleString('en-IN')}</div>
             </div>
             <div style={{ padding: '16px', backgroundColor: 'var(--color-bg)', borderRadius: '8px' }}>
               <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Current Valuation</div>
               <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--color-success)' }}>
-                ₹ {customer.mfSummary.currentPortfolioValue.toLocaleString('en-IN')}
+                ₹ {(customer.mfSummary?.currentPortfolioValue || 0).toLocaleString('en-IN')}
               </div>
             </div>
             <div style={{ padding: '16px', backgroundColor: 'var(--color-bg)', borderRadius: '8px' }}>
               <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Total Annual Premiums</div>
               <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--color-info)' }}>
-                ₹ {customer.insuranceSummary.totalPremium.toLocaleString('en-IN')}
+                ₹ {(customer.insuranceSummary?.totalPremium || 0).toLocaleString('en-IN')}
               </div>
             </div>
           </div>

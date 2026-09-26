@@ -1,4 +1,4 @@
-// API Client with Backend REST Integration and Fallback Dataset
+// API Client with Backend REST Integration and Intelligent Fallback
 import * as mockData from './mockData';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -6,89 +6,109 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 export const apiClient = {
   async get(url, config = {}) {
     try {
-      const response = await fetch(`${BASE_URL}${url}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('insecure_token') || ''}`,
-          'X-Agency-ID': localStorage.getItem('insecure_agency_id') || 'agency-1',
-          ...config.headers
-        }
-      });
+      const headers = {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+        ...config.headers
+      };
+
+      const response = await fetch(`${BASE_URL}${url}`, { headers });
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          console.warn(`API Authorization error ${response.status} on ${url}`);
-        }
         throw new Error(`HTTP Error ${response.status}`);
       }
       return await response.json();
     } catch (err) {
-      console.info(`[API Fallback] Using mock dataset for GET ${url}`);
+      console.warn(`[API Get Fallback for ${url}]:`, err.message);
       return handleMockGet(url);
     }
   },
 
   async post(url, data, config = {}) {
     try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+        ...config.headers
+      };
+
       const response = await fetch(`${BASE_URL}${url}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('insecure_token') || ''}`,
-          'X-Agency-ID': localStorage.getItem('insecure_agency_id') || 'agency-1',
-          ...config.headers
-        },
+        headers,
         body: JSON.stringify(data)
       });
-      if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+      if (!response.ok) {
+        const errorJson = await response.json().catch(() => null);
+        throw new Error(errorJson?.message || `HTTP Error ${response.status}`);
+      }
       return await response.json();
     } catch (err) {
-      console.info(`[API Fallback] Using mock response for POST ${url}`);
-      return { success: true, data: { id: `generated-${Date.now()}`, ...data } };
+      console.error(`[API Post Error on ${url}]:`, err.message);
+      throw err;
     }
   },
 
   async put(url, data, config = {}) {
     try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+        ...config.headers
+      };
+
       const response = await fetch(`${BASE_URL}${url}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('insecure_token') || ''}`,
-          'X-Agency-ID': localStorage.getItem('insecure_agency_id') || 'agency-1',
-          ...config.headers
-        },
+        headers,
         body: JSON.stringify(data)
       });
-      if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+      if (!response.ok) {
+        const errorJson = await response.json().catch(() => null);
+        throw new Error(errorJson?.message || `HTTP Error ${response.status}`);
+      }
       return await response.json();
     } catch (err) {
-      console.info(`[API Fallback] Using mock response for PUT ${url}`);
-      return { success: true, data };
+      console.error(`[API Put Error on ${url}]:`, err.message);
+      throw err;
     }
   },
 
   async delete(url, config = {}) {
     try {
+      const headers = {
+        ...getAuthHeaders(),
+        ...config.headers
+      };
+
       const response = await fetch(`${BASE_URL}${url}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('insecure_token') || ''}`,
-          'X-Agency-ID': localStorage.getItem('insecure_agency_id') || 'agency-1',
-          ...config.headers
-        }
+        headers
       });
-      if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP Error ${response.status}`);
+      }
       return await response.json();
     } catch (err) {
-      console.info(`[API Fallback] Using mock response for DELETE ${url}`);
-      return { success: true };
+      console.error(`[API Delete Error on ${url}]:`, err.message);
+      throw err;
     }
   }
 };
 
+function getAuthHeaders() {
+  const token = localStorage.getItem('insecure_token');
+  const agencyId = localStorage.getItem('insecure_agency_id');
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (agencyId) {
+    headers['X-Agency-ID'] = agencyId;
+  }
+  return headers;
+}
+
 function handleMockGet(url) {
   if (url.includes('/customers')) {
-    return { status: 'success', data: mockData.MOCK_CUSTOMERS };
+    return { status: 'success', data: { data: mockData.MOCK_CUSTOMERS, customers: mockData.MOCK_CUSTOMERS } };
   }
   if (url.includes('/insurance')) {
     return { status: 'success', data: mockData.MOCK_POLICIES };

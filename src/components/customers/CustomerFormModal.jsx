@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Loader } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { DuplicateResolutionModal } from './DuplicateResolutionModal';
-import { MOCK_CUSTOMERS } from '../../api/mockData';
 import { useToast } from '../../context/ToastContext';
+import { useAgency } from '../../context/AgencyContext';
+import { apiClient } from '../../api/client';
 
 export const CustomerFormModal = ({ isOpen, onClose, onSaveSuccess }) => {
   const { addToast } = useToast();
+  const { currentAgency } = useAgency();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     mobile: '',
@@ -49,29 +52,44 @@ export const CustomerFormModal = ({ isOpen, onClose, onSaveSuccess }) => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Check for duplicate mobile or PAN in agency
-    const existing = MOCK_CUSTOMERS.find(c => 
-      c.mobile === formData.mobile.trim() || 
-      (formData.pan && c.pan && c.pan.toUpperCase() === formData.pan.trim().toUpperCase())
-    );
-
-    if (existing) {
-      setDuplicateMatch(existing);
-      setShowDuplicateModal(true);
-      return;
-    }
-
-    saveCustomerRecord(formData);
+    await saveCustomerRecord(formData);
   };
 
-  const saveCustomerRecord = (data) => {
-    addToast(`Customer ${data.name} saved successfully!`, 'success');
-    if (onSaveSuccess) onSaveSuccess(data);
-    onClose();
-    resetForm();
+  const saveCustomerRecord = async (data) => {
+    setIsSubmitting(true);
+    const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
+    
+    try {
+      const response = await apiClient.post(`/agencies/${agencyId}/customers`, {
+        name: data.name.trim(),
+        mobile: data.mobile.trim(),
+        email: data.email?.trim(),
+        dob: data.dob || undefined,
+        pan: data.pan?.trim()?.toUpperCase() || undefined,
+        aadhaar: data.aadhaar?.trim() || undefined,
+        address: data.address?.trim() || undefined,
+        occupation: data.occupation?.trim() || undefined,
+        annualIncome: data.annualIncome ? Number(data.annualIncome) : undefined,
+        nominees: data.nominees
+      });
+
+      const created = response.data || response;
+      addToast(`Customer ${data.name} saved successfully!`, 'success');
+      if (onSaveSuccess) onSaveSuccess(created);
+      onClose();
+      resetForm();
+    } catch (err) {
+      if (err.message && err.message.includes('already exists')) {
+        setDuplicateMatch({ name: data.name, mobile: data.mobile, pan: data.pan });
+        setShowDuplicateModal(true);
+      } else {
+        addToast(err.message || 'Failed to save customer', 'danger');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDuplicateResolve = (action) => {
@@ -81,13 +99,9 @@ export const CustomerFormModal = ({ isOpen, onClose, onSaveSuccess }) => {
       return;
     }
     if (action === 'update' || action === 'merge') {
-      addToast(`Updated existing profile for ${duplicateMatch.name}`, 'success');
+      addToast(`Updated existing profile for ${duplicateMatch?.name}`, 'success');
       onClose();
       resetForm();
-      return;
-    }
-    if (action === 'separate') {
-      saveCustomerRecord({ ...formData, id: `cust-sep-${Date.now()}` });
     }
   };
 
@@ -187,8 +201,16 @@ export const CustomerFormModal = ({ isOpen, onClose, onSaveSuccess }) => {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px', borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary">Save Customer</button>
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader size={16} className="animate-spin" /> Saving...
+                </>
+              ) : (
+                'Save Customer'
+              )}
+            </button>
           </div>
         </form>
       </Modal>
