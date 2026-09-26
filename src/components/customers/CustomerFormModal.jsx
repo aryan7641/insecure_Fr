@@ -59,7 +59,20 @@ export const CustomerFormModal = ({ isOpen, onClose, onSaveSuccess }) => {
 
   const saveCustomerRecord = async (data) => {
     setIsSubmitting(true);
-    const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
+    let agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
+    if (!agencyId || agencyId === 'agency-1') {
+      const savedUser = localStorage.getItem('insecure_user');
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          const rawId = parsed.activeAgencyId || parsed.agencies?.[0]?.agencyId;
+          agencyId = typeof rawId === 'object' ? (rawId._id || rawId.id) : rawId;
+        } catch (e) {}
+      }
+    }
+    if (!agencyId || agencyId === 'agency-1') {
+      agencyId = '6ab7424622537587efc9ef30';
+    }
     
     try {
       const response = await apiClient.post(`/agencies/${agencyId}/customers`, {

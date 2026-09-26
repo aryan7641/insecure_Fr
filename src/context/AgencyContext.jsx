@@ -15,12 +15,16 @@ export const AgencyProvider = ({ children }) => {
     async function loadAgencies() {
       try {
         const res = await apiClient.get('/agencies');
-        if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
-          setAgencies(res.data);
+        const list = res?.data?.agencies || res?.data?.data || (Array.isArray(res?.data) ? res.data : []);
+        if (Array.isArray(list) && list.length > 0) {
+          setAgencies(list);
           const savedAgencyId = localStorage.getItem('insecure_agency_id');
-          const matched = res.data.find(a => (a.id || a._id) === savedAgencyId) || res.data[0];
+          const matched = list.find(a => (a.id || a._id) === savedAgencyId) || list[0];
           setCurrentAgency(matched);
-          localStorage.setItem('insecure_agency_id', matched.id || matched._id);
+          const rawId = matched.id || matched._id;
+          if (rawId) {
+            localStorage.setItem('insecure_agency_id', rawId);
+          }
         }
       } catch (e) {
         // use fallback
@@ -32,7 +36,10 @@ export const AgencyProvider = ({ children }) => {
   useEffect(() => {
     if (currentAgency) {
       localStorage.setItem('insecure_agency', JSON.stringify(currentAgency));
-      localStorage.setItem('insecure_agency_id', currentAgency.id || currentAgency._id || 'agency-1');
+      const agencyId = currentAgency.id || currentAgency._id;
+      if (agencyId && agencyId !== 'agency-1') {
+        localStorage.setItem('insecure_agency_id', agencyId);
+      }
     }
   }, [currentAgency]);
 
