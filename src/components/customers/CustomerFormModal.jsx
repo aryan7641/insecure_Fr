@@ -59,6 +59,17 @@ export const CustomerFormModal = ({ isOpen, onClose, onSaveSuccess }) => {
 
   const saveCustomerRecord = async (data) => {
     setIsSubmitting(true);
+    
+    // Clean mobile number (strip non-digits, take last 10 digits if country code is included)
+    const rawMobile = (data.mobile || '').replace(/\D/g, '');
+    const cleanedMobile = rawMobile.length >= 10 ? rawMobile.slice(-10) : rawMobile;
+
+    if (cleanedMobile.length !== 10) {
+      addToast('Please enter a valid 10-digit mobile number', 'danger');
+      setIsSubmitting(false);
+      return;
+    }
+
     let agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
     if (!agencyId || agencyId === 'agency-1') {
       const savedUser = localStorage.getItem('insecure_user');
@@ -77,8 +88,8 @@ export const CustomerFormModal = ({ isOpen, onClose, onSaveSuccess }) => {
     try {
       const response = await apiClient.post(`/agencies/${agencyId}/customers`, {
         name: data.name.trim(),
-        mobile: data.mobile.trim(),
-        email: data.email?.trim(),
+        mobile: cleanedMobile,
+        email: data.email?.trim() || undefined,
         dob: data.dob || undefined,
         pan: data.pan?.trim()?.toUpperCase() || undefined,
         aadhaar: data.aadhaar?.trim() || undefined,
@@ -90,12 +101,16 @@ export const CustomerFormModal = ({ isOpen, onClose, onSaveSuccess }) => {
 
       const created = response.data || response;
       addToast(`Customer ${data.name} saved successfully!`, 'success');
+      
+      // Dispatch global event for instant UI sync across all components
+      window.dispatchEvent(new CustomEvent('customerCreated', { detail: created }));
+
       if (onSaveSuccess) onSaveSuccess(created);
       onClose();
       resetForm();
     } catch (err) {
-      if (err.message && err.message.includes('already exists')) {
-        setDuplicateMatch({ name: data.name, mobile: data.mobile, pan: data.pan });
+      if (err.message && (err.message.includes('already exists') || err.message.includes('duplicate'))) {
+        setDuplicateMatch({ name: data.name, mobile: cleanedMobile, pan: data.pan });
         setShowDuplicateModal(true);
       } else {
         addToast(err.message || 'Failed to save customer', 'danger');
@@ -146,7 +161,7 @@ export const CustomerFormModal = ({ isOpen, onClose, onSaveSuccess }) => {
 
             <div className="form-group">
               <label className="form-label">Mobile Number (Primary ID) *</label>
-              <input type="tel" name="mobile" className="form-input" required pattern="[0-9]{10}" maxLength={10} value={formData.mobile} onChange={handleChange} placeholder="10-digit mobile" />
+              <input type="tel" name="mobile" className="form-input" required value={formData.mobile} onChange={handleChange} placeholder="e.g. 9876543210" />
             </div>
 
             <div className="form-group">

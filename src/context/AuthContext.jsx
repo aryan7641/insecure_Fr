@@ -50,19 +50,22 @@ export const AuthProvider = ({ children }) => {
               if (userAgency) {
                 const rawId = typeof userAgency === 'object' ? (userAgency._id || userAgency.id) : userAgency;
                 setAgencyId(rawId);
+                localStorage.setItem('insecure_agency_id', rawId);
               }
               return;
             }
+          } else {
+            // Expired or invalid token: clean storage so app is in fresh state
+            localStorage.removeItem('insecure_token');
+            localStorage.removeItem('insecure_user');
           }
         } catch (e) {
-          // continue to fallback
+          // network error fallback
         }
       }
 
-      // If no valid token, auto-login default admin user
-      if (!storedToken || storedToken.startsWith('mock-')) {
-        login('admin@apexwealth.in', 'password123', 'Admin').catch(() => {});
-      }
+      // If no valid session token exists, auto-login default admin user to provide seamless experience
+      await login('admin@apexwealth.in', 'password123', 'Admin').catch(() => {});
     }
 
     verifyOrLogin();

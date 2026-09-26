@@ -41,6 +41,15 @@ export const CustomersPage = () => {
 
   useEffect(() => {
     fetchCustomers();
+
+    const handleCustomerCreated = () => {
+      fetchCustomers();
+    };
+
+    window.addEventListener('customerCreated', handleCustomerCreated);
+    return () => {
+      window.removeEventListener('customerCreated', handleCustomerCreated);
+    };
   }, [fetchCustomers]);
 
   // Filter based on role and search query
