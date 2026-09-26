@@ -35,11 +35,13 @@ export const AuthCallbackPage = () => {
           console.warn('Unable to fetch user details:', e.message);
         }
 
-        navigate('/dashboard', { replace: true });
-        window.location.reload();
+        // Clean direct redirect to dashboard
+        window.location.href = '/dashboard';
       } else {
         setStatus('Authentication failed or no token received. Redirecting to login...');
-        setTimeout(() => navigate('/login', { replace: true }), 2000);
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
       }
     }
 
