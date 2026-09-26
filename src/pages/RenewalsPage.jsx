@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   RefreshCw, Calendar, AlertTriangle, CheckCircle, Clock, Shield, 
-  MessageSquare, User, Phone, Search, Filter, ArrowUpRight, ExternalLink, Loader
+  MessageSquare, User, Phone, Search, Filter, ArrowUpRight, ExternalLink, Loader,
+  CheckCircle2, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAgency } from '../context/AgencyContext';
@@ -119,85 +120,98 @@ export const RenewalsPage = () => {
     { id: '15d', label: 'Next 15 Days', count: accessiblePolicies.filter(p => { const d = getDaysRemaining(p.renewalDate || p.endDate); return d !== null && d >= 0 && d <= 15; }).length },
     { id: '30d', label: 'Next 30 Days', count: accessiblePolicies.filter(p => { const d = getDaysRemaining(p.renewalDate || p.endDate); return d !== null && d >= 0 && d <= 30; }).length },
     { id: 'upcoming', label: 'Upcoming', count: accessiblePolicies.filter(p => { const d = getDaysRemaining(p.renewalDate || p.endDate); return d !== null && d > 30; }).length },
-    { id: 'expired', label: 'Overdue / Expired', count: accessiblePolicies.filter(p => { const d = getDaysRemaining(p.renewalDate || p.endDate); return p.status === 'expired' || (d !== null && d < 0); }).length },
+    { id: 'expired', label: 'Overdue / Lapsed', count: accessiblePolicies.filter(p => { const d = getDaysRemaining(p.renewalDate || p.endDate); return p.status === 'expired' || (d !== null && d < 0); }).length },
     { id: 'renewed', label: 'Renewed', count: accessiblePolicies.filter(p => p.status === 'renewed' || p.renewedToPolicyId).length }
   ];
 
   return (
-    <div>
+    <div style={{ maxWidth: 'var(--content-max-width)', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: '700' }}>Renewal Operations Center</h1>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '2px' }}>
-            Daily contact list answering: <strong style={{ color: 'var(--color-primary)' }}>Who do I need to reach out to today?</strong>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: '700', color: 'var(--color-text-main)', letterSpacing: '-0.02em' }}>
+              Renewal Operations Center
+            </h1>
+            <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '9999px', backgroundColor: 'var(--color-accent-subtle)', color: 'var(--color-accent)', fontWeight: '700' }}>
+              {filteredPolicies.length} in Horizon
+            </span>
+          </div>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13.5px' }}>
+            Daily contact pipeline answering: <strong style={{ color: 'var(--color-text-main)' }}>Who do I need to reach out to today?</strong>
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
           <button 
-            className="btn btn-secondary"
+            className="btn btn-secondary btn-sm"
             onClick={fetchPolicies}
             title="Refresh List"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span>Sync</span>
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Horizon Tabs */}
       <div style={{
         display: 'flex',
-        gap: '8px',
+        gap: '6px',
         borderBottom: '1px solid var(--color-border)',
-        marginBottom: '20px',
         overflowX: 'auto',
         paddingBottom: '2px'
       }}>
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabChange(tab.id)}
-            style={{
-              padding: '8px 16px',
-              fontSize: '13px',
-              fontWeight: activeTab === tab.id ? '600' : '500',
-              color: activeTab === tab.id ? 'var(--color-accent)' : 'var(--color-text-muted)',
-              borderBottom: activeTab === tab.id ? '2px solid var(--color-accent)' : '2px solid transparent',
-              backgroundColor: 'transparent',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              whiteSpace: 'nowrap',
-              cursor: 'pointer'
-            }}
-          >
-            <span>{tab.label}</span>
-            <span style={{
-              fontSize: '11px',
-              padding: '1px 6px',
-              borderRadius: '10px',
-              backgroundColor: activeTab === tab.id ? 'var(--color-accent-light)' : 'var(--color-bg)',
-              color: activeTab === tab.id ? 'var(--color-accent)' : 'var(--color-text-muted)',
-              fontWeight: '700'
-            }}>
-              {tab.count}
-            </span>
-          </button>
-        ))}
+        {tabs.map(tab => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              style={{
+                padding: '8px 14px',
+                fontSize: '13px',
+                fontWeight: isActive ? '600' : '500',
+                color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                borderBottom: isActive ? '2px solid var(--color-accent)' : '2px solid transparent',
+                backgroundColor: 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>{tab.label}</span>
+              <span style={{
+                fontSize: '11px',
+                padding: '1px 6px',
+                borderRadius: '9999px',
+                backgroundColor: isActive ? 'var(--color-accent-subtle)' : '#f1f5f9',
+                color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                fontWeight: '700'
+              }}>
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Filter Bar */}
-      <div className="card" style={{ padding: '14px 16px', marginBottom: '20px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+      {/* Filter Toolbar */}
+      <div className="card" style={{ padding: '12px 16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
-          <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+          <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
           <input
             type="text"
             className="input"
-            placeholder="Search by customer name, mobile, policy #, insurer..."
+            placeholder="Search by client name, mobile, policy #, insurer..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ paddingLeft: '36px', width: '100%' }}
+            style={{ paddingLeft: '36px', width: '100%', fontSize: '13px' }}
           />
         </div>
 
@@ -205,9 +219,9 @@ export const RenewalsPage = () => {
           className="select"
           value={lobFilter}
           onChange={(e) => setLobFilter(e.target.value)}
-          style={{ width: '180px' }}
+          style={{ width: '170px', fontSize: '13px' }}
         >
-          <option value="ALL">All Lines of Business</option>
+          <option value="ALL">All Lines (LOB)</option>
           <option value="health">Health Insurance</option>
           <option value="motor">Motor Insurance</option>
           <option value="life">Life Insurance</option>
@@ -218,32 +232,50 @@ export const RenewalsPage = () => {
         </select>
       </div>
 
-      {/* Renewal List */}
+      {/* Renewal List Cards */}
       {loading ? (
-        <div className="card" style={{ padding: '50px', textAlign: 'center' }}>
-          <Loader size={28} className="animate-spin" style={{ margin: '0 auto 12px auto', color: 'var(--color-accent)' }} />
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Loading renewal portfolio...</p>
+        <div className="card" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <Loader size={24} className="animate-spin" style={{ margin: '0 auto 10px auto', color: 'var(--color-accent)' }} />
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Loading renewal portfolio...</p>
         </div>
       ) : filteredPolicies.length === 0 ? (
         <div className="card" style={{ padding: '48px 24px', textAlign: 'center' }}>
-          <CheckCircle size={40} color="var(--color-success)" style={{ margin: '0 auto 12px auto' }} />
-          <h3 style={{ fontSize: '16px', fontWeight: '600' }}>You're all caught up!</h3>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '12px',
+            backgroundColor: '#f0fdf4',
+            color: '#16a34a',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 12px auto'
+          }}>
+            <CheckCircle2 size={24} />
+          </div>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--color-text-main)' }}>You're all caught up!</h3>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: '4px' }}>
-            No policies matching this horizon filter require action.
+            No policies matching this horizon filter require action right now.
           </p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filteredPolicies.map((policy) => {
             const targetDate = policy.renewalDate || policy.endDate;
             const days = getDaysRemaining(targetDate);
             const lob = getLOBBadge(policy.lob || policy.policyType);
             const cust = policy.customerId || { name: policy.customerName, mobile: policy.customerMobile };
+            const custId = policy.customerId?._id || policy.customerId?.id;
+            const insurer = policy.insuranceCompany || policy.insurerName || 'Insurer';
+            const prem = policy.premiumAmount || policy.premium || policy.finalPremium || 0;
+
+            const isUrgent = days !== null && days <= 7;
+            const isOverdue = days !== null && days < 0;
 
             return (
               <div 
                 key={policy._id || policy.id}
-                className="card"
+                className="card card-interactive"
                 style={{
                   padding: '16px 20px',
                   display: 'flex',
@@ -251,38 +283,44 @@ export const RenewalsPage = () => {
                   justifyContent: 'space-between',
                   gap: '16px',
                   flexWrap: 'wrap',
-                  borderLeft: `4px solid ${days <= 7 ? 'var(--color-danger)' : days <= 15 ? 'var(--color-warning)' : 'var(--color-accent)'}`
+                  borderLeft: `4px solid ${isOverdue ? '#dc2626' : isUrgent ? '#d97706' : 'var(--color-accent)'}`
                 }}
               >
                 {/* Customer & Policy Details */}
                 <div style={{ flex: 2, minWidth: '280px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <span style={{ 
-                      fontSize: '11px', 
+                      fontSize: '10.5px', 
                       fontWeight: '700', 
-                      padding: '2px 8px', 
+                      padding: '2px 7px', 
                       borderRadius: '4px', 
                       backgroundColor: lob.bg, 
                       color: lob.color,
-                      border: `1px solid ${lob.border}`
+                      border: `1px solid ${lob.border}`,
+                      textTransform: 'uppercase'
                     }}>
                       {lob.label}
                     </span>
-                    <button
-                      onClick={() => policy.customerId?._id && navigate(`/customers/${policy.customerId._id}`)}
-                      style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-primary)', textAlign: 'left' }}
+
+                    <span
+                      onClick={() => custId && navigate(`/customers/${custId}`)}
+                      style={{ fontSize: '14.5px', fontWeight: '700', color: 'var(--color-text-main)', cursor: custId ? 'pointer' : 'default' }}
                     >
-                      {cust.name || 'Unnamed Customer'}
-                    </button>
+                      {cust.name || 'Unnamed Client'}
+                    </span>
+
                     {cust.mobile && (
-                      <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Phone size={12} /> {cust.mobile}
-                      </span>
+                      <a 
+                        href={`tel:${cust.mobile}`}
+                        style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}
+                      >
+                        <Phone size={11} style={{ color: 'var(--color-text-light)' }} /> {cust.mobile}
+                      </a>
                     )}
                   </div>
 
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                    <span><strong>Insurer:</strong> {policy.insurerName || policy.insuranceCompany || '—'}</span>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'flex', gap: '14px', flexWrap: 'wrap', marginTop: '4px' }}>
+                    <span><strong>Insurer:</strong> {insurer}</span>
                     <span><strong>Policy No:</strong> #{policy.policyNumber}</span>
                     {policy.vehicleDetails?.registrationNumber && (
                       <span><strong>Vehicle:</strong> {policy.vehicleDetails.registrationNumber} ({policy.vehicleDetails.make} {policy.vehicleDetails.model})</span>
@@ -291,35 +329,47 @@ export const RenewalsPage = () => {
                 </div>
 
                 {/* Financials & Expiry Horizon */}
-                <div style={{ flex: 1, minWidth: '180px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--color-primary)' }}>
-                    {formatINR(policy.premiumAmount || policy.premium)}
+                <div style={{ flex: 1, minWidth: '170px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-text-main)' }}>
+                    {formatINR(prem)}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                    Expires: <strong style={{ color: 'var(--color-text-main)' }}>{formatDate(targetDate)}</strong>
+                    Due: <strong style={{ color: 'var(--color-text-body)' }}>{formatDate(targetDate)}</strong>
                   </div>
                   <div style={{ marginTop: '4px' }}>
-                    <span className={`badge ${days <= 0 ? 'badge-danger' : days <= 7 ? 'badge-danger' : days <= 15 ? 'badge-warning' : 'badge-info'}`}>
-                      {days === null ? 'No Date' : days === 0 ? 'Expires Today' : days < 0 ? `Overdue by ${Math.abs(days)}d` : `${days} days remaining`}
+                    <span className={`badge ${isOverdue ? 'badge-danger' : isUrgent ? 'badge-warning' : 'badge-neutral'}`} style={{ fontSize: '11px' }}>
+                      {days === null ? 'No Date' : days === 0 ? 'Due Today' : days < 0 ? `Overdue ${Math.abs(days)}d` : `${days} days left`}
                     </span>
                   </div>
                 </div>
 
                 {/* Direct Outreach Actions */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <button
-                    className="btn btn-sm btn-secondary"
-                    style={{ color: '#16a34a', borderColor: '#bbf7d0', gap: '6px' }}
                     onClick={() => handleOpenWhatsapp(policy)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: '#25D366',
+                      color: '#ffffff',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
                   >
-                    <MessageSquare size={14} /> WhatsApp
+                    <MessageSquare size={13} />
+                    <span>WhatsApp</span>
                   </button>
 
                   <button
-                    className="btn btn-sm btn-primary"
-                    onClick={() => policy.customerId?._id ? navigate(`/customers/${policy.customerId._id}?tab=policies`) : navigate('/insurance')}
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => custId ? navigate(`/customers/${custId}?tab=insurance`) : navigate('/insurance')}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                   >
-                    View Policy <ArrowUpRight size={14} />
+                    <span>View Policy</span>
+                    <ArrowUpRight size={13} />
                   </button>
                 </div>
               </div>

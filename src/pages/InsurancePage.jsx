@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Shield, Search, Filter, UploadCloud, MessageSquare, 
-  RefreshCw, FileText, Loader, ExternalLink, AlertCircle, CheckCircle
+  RefreshCw, FileText, Loader, ExternalLink, AlertCircle, CheckCircle, ChevronRight, User
 } from 'lucide-react';
 import { PolicyStatusBadge } from '../components/insurance/PolicyStatusBadge';
 import { PolicyFormModal } from '../components/insurance/PolicyFormModal';
@@ -11,6 +11,7 @@ import { WhatsappPreviewModal } from '../components/whatsapp/WhatsappPreviewModa
 import { useAuth } from '../context/AuthContext';
 import { useAgency } from '../context/AgencyContext';
 import { apiClient } from '../api/client';
+import { formatINR, formatDate, getDaysRemaining, getLOBBadge } from '../utils/formatters';
 
 export const InsurancePage = () => {
   const navigate = useNavigate();
@@ -73,7 +74,8 @@ export const InsurancePage = () => {
 
     // Type / LOB filter
     if (typeFilter !== 'ALL') {
-      if (p.policyType?.toLowerCase() !== typeFilter.toLowerCase()) return false;
+      const polLob = (p.lob || p.policyType || '').toLowerCase();
+      if (polLob !== typeFilter.toLowerCase()) return false;
     }
 
     // Search query
@@ -81,7 +83,7 @@ export const InsurancePage = () => {
     if (q) {
       const polNum = (p.policyNumber || '').toLowerCase();
       const custName = (p.customerId?.name || p.customerName || '').toLowerCase();
-      const insurer = (p.insuranceCompany || '').toLowerCase();
+      const insurer = (p.insuranceCompany || p.insurerName || '').toLowerCase();
       const vehReg = (p.vehicleDetails?.registrationNumber || '').toLowerCase();
       const plan = (p.productName || p.planName || '').toLowerCase();
 
@@ -91,8 +93,9 @@ export const InsurancePage = () => {
     }
 
     // Expiring within days
-    if (expiringFilter !== 'ALL' && p.renewalDate) {
-      const diffDays = Math.ceil((new Date(p.renewalDate) - new Date()) / (1000 * 60 * 60 * 24));
+    if (expiringFilter !== 'ALL' && (p.renewalDate || p.endDate)) {
+      const targetDate = p.renewalDate || p.endDate;
+      const diffDays = Math.ceil((new Date(targetDate) - new Date()) / (1000 * 60 * 60 * 24));
       const targetDays = parseInt(expiringFilter, 10);
       if (diffDays < 0 || diffDays > targetDays) return false;
     }
@@ -106,85 +109,95 @@ export const InsurancePage = () => {
     setSelectedPolicyForWhatsapp(policy);
   };
 
-  const calculateDaysRemaining = (renewalDate) => {
-    if (!renewalDate) return null;
-    const diff = Math.ceil((new Date(renewalDate) - new Date()) / (1000 * 60 * 60 * 24));
-    if (diff < 0) return <span style={{ color: 'var(--color-danger)', fontWeight: '700' }}>Expired ({Math.abs(diff)}d ago)</span>;
-    if (diff === 0) return <span style={{ color: 'var(--color-danger)', fontWeight: '700' }}>Due Today</span>;
-    if (diff <= 30) return <span style={{ color: 'var(--color-warning)', fontWeight: '700' }}>Due in {diff} days</span>;
-    return <span style={{ color: 'var(--color-text-muted)' }}>{diff} days</span>;
-  };
-
   return (
-    <div>
+    <div style={{ maxWidth: 'var(--content-max-width)', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: '700' }}>Insurance Policy Management</h1>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '2px' }}>
-            Centralized Indian Insurance CRM: Health, Motor, Life, Term, General. Automated renewal tracking.
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: '700', color: 'var(--color-text-main)', letterSpacing: '-0.02em' }}>
+              Policy Management
+            </h1>
+            <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '9999px', backgroundColor: 'var(--color-accent-subtle)', color: 'var(--color-accent)', fontWeight: '700' }}>
+              {displayedPolicies.length} Policies
+            </span>
+          </div>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13.5px' }}>
+            Multi-insurer portfolio spanning Health, Motor, Life, Term, Travel, Home, and Commercial policies.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
           <button 
-            className="btn btn-secondary"
+            className="btn btn-secondary btn-sm"
             onClick={fetchPolicies}
             title="Refresh List"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span>Sync</span>
           </button>
+
           <button 
-            className="btn btn-primary"
-            onClick={() => setIsPdfModalOpen(true)}
-            style={{ backgroundColor: '#2563eb' }}
-          >
-            <UploadCloud size={16} /> Upload Policy PDF (AI OCR)
-          </button>
-          <button 
-            className="btn btn-secondary"
+            className="btn btn-secondary btn-sm"
             onClick={() => setIsManualModalOpen(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            <Plus size={16} /> Manual Entry
+            <Plus size={14} />
+            <span>Manual Entry</span>
+          </button>
+
+          <button 
+            className="btn btn-primary btn-sm"
+            onClick={() => setIsPdfModalOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: 'var(--color-accent)'
+            }}
+          >
+            <UploadCloud size={14} />
+            <span>Upload Policy PDF</span>
           </button>
         </div>
       </div>
 
-      {/* Filter & Search Toolbar */}
-      <div className="card" style={{ padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ flex: '1 1 280px', position: 'relative' }}>
-          <Search size={18} style={{ position: 'absolute', left: '12px', top: '11px', color: 'var(--color-text-muted)' }} />
+      {/* Filter Toolbar */}
+      <div className="card" style={{ padding: '12px 16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 260px', position: 'relative' }}>
+          <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
           <input
             type="text"
-            className="form-input"
-            style={{ paddingLeft: '40px' }}
-            placeholder="Search policy #, customer, insurer, vehicle reg (e.g. MH02EK4921)..."
+            className="input"
+            style={{ paddingLeft: '36px', width: '100%', fontSize: '13px' }}
+            placeholder="Search policy #, client name, insurer, vehicle reg..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
         <select
-          className="form-select"
-          style={{ width: '180px' }}
+          className="select"
+          style={{ width: '160px', fontSize: '13px' }}
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
         >
-          <option value="ALL">All Insurance Lines</option>
-          <option value="health">Health Insurance</option>
-          <option value="motor">Motor Insurance</option>
-          <option value="term">Term Life Insurance</option>
-          <option value="life">Life Insurance</option>
-          <option value="travel">Travel Insurance</option>
-          <option value="home">Home Insurance</option>
-          <option value="commercial">Commercial Insurance</option>
-          <option value="group">Group Insurance</option>
-          <option value="other">Other Insurance</option>
+          <option value="ALL">All Lines (LOB)</option>
+          <option value="health">Health</option>
+          <option value="motor">Motor</option>
+          <option value="term">Term</option>
+          <option value="life">Life</option>
+          <option value="travel">Travel</option>
+          <option value="home">Home</option>
+          <option value="commercial">Commercial</option>
+          <option value="general">General</option>
         </select>
 
         <select
-          className="form-select"
-          style={{ width: '160px' }}
+          className="select"
+          style={{ width: '140px', fontSize: '13px' }}
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
@@ -196,12 +209,12 @@ export const InsurancePage = () => {
         </select>
 
         <select
-          className="form-select"
-          style={{ width: '180px' }}
+          className="select"
+          style={{ width: '160px', fontSize: '13px' }}
           value={expiringFilter}
           onChange={(e) => setExpiringFilter(e.target.value)}
         >
-          <option value="ALL">All Renewal Dates</option>
+          <option value="ALL">All Expiry Windows</option>
           <option value="7">Expiring in 7 Days</option>
           <option value="15">Expiring in 15 Days</option>
           <option value="30">Expiring in 30 Days</option>
@@ -209,173 +222,209 @@ export const InsurancePage = () => {
       </div>
 
       {/* Policies Data Table */}
-      <div className="table-container">
-        {loading && policies.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-            <Loader size={28} className="animate-spin" style={{ margin: '0 auto 12px' }} />
-            <p>Loading insurance policies from database...</p>
+      {loading && policies.length === 0 ? (
+        <div className="card" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <Loader size={24} className="animate-spin" style={{ margin: '0 auto 10px auto', color: 'var(--color-accent)' }} />
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Loading policy portfolio...</p>
+        </div>
+      ) : displayedPolicies.length === 0 ? (
+        <div className="card" style={{ padding: '48px 24px', textAlign: 'center' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '12px',
+            backgroundColor: '#f1f5f9',
+            color: 'var(--color-text-muted)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 12px auto'
+          }}>
+            <Shield size={24} />
           </div>
-        ) : displayedPolicies.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-            <Shield size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-            <p style={{ fontSize: '16px', fontWeight: '600' }}>No policies found</p>
-            <p style={{ fontSize: '13px', marginTop: '4px' }}>
-              Click <strong>"Upload Policy PDF (AI OCR)"</strong> above to extract and create your first policy.
-            </p>
-          </div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Policy Details</th>
-                <th>Customer</th>
-                <th>Plan / Vehicle Details</th>
-                <th>Sum Assured & Premium</th>
-                <th>Renewal Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayedPolicies.map(p => {
-                const polId = p.id || p._id;
-                const cust = p.customerId;
-                const custName = cust?.name || p.customerName || 'Customer';
-                const custId = cust?._id || cust?.id;
-                const premiumFormatted = (p.premium || p.finalPremium || 0).toLocaleString('en-IN');
-                const sumAssuredFormatted = p.sumAssured ? `₹ ${(p.sumAssured).toLocaleString('en-IN')}` : '—';
-                const renewalFormatted = p.renewalDate ? new Date(p.renewalDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+          <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--color-text-main)' }}>No policies found</h3>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: '4px', maxWidth: '400px', margin: '4px auto 16px auto' }}>
+            {searchTerm ? 'No policy matched your search criteria. Try a different query.' : 'Upload your first insurance policy PDF (AI OCR) to start building your book.'}
+          </p>
+          <button className="btn btn-primary btn-sm" onClick={() => setIsPdfModalOpen(true)}>
+            <UploadCloud size={14} /> Upload Policy PDF
+          </button>
+        </div>
+      ) : (
+        <div className="card" style={{ overflow: 'hidden', padding: 0 }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table" style={{ width: '100%', margin: 0 }}>
+              <thead>
+                <tr>
+                  <th style={{ paddingLeft: '20px' }}>Policy & Insurer</th>
+                  <th>Client</th>
+                  <th>Coverage & Plan</th>
+                  <th>Sum Assured</th>
+                  <th>Premium</th>
+                  <th>Renewal Countdown</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right', paddingRight: '20px' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedPolicies.map(p => {
+                  const polId = p.id || p._id;
+                  const cust = p.customerId;
+                  const custName = cust?.name || p.customerName || 'Insured Client';
+                  const custId = cust?._id || cust?.id;
+                  const insurer = p.insuranceCompany || p.insurerName || 'Insurer';
+                  const lob = p.lob || p.policyType || 'General';
+                  const prem = p.premiumAmount || p.premium || p.finalPremium || 0;
+                  const days = getDaysRemaining(p.renewalDate || p.endDate);
 
-                return (
-                  <tr key={polId}>
-                    <td>
-                      <div style={{ fontWeight: '700', color: 'var(--color-accent)' }}>
-                        {p.policyNumber}
-                      </div>
-                      <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--color-text-main)' }}>
-                        {p.insuranceCompany}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                        {p.subLob || p.policyType?.toUpperCase()}
-                      </div>
-                    </td>
-
-                    <td>
-                      <div 
-                        style={{ fontWeight: '600', cursor: custId ? 'pointer' : 'default', color: custId ? 'var(--color-primary)' : 'inherit' }}
-                        onClick={() => custId && navigate(`/customers/${custId}`)}
-                      >
-                        {custName}
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                        {cust?.mobile || p.customerMobile || '—'}
-                      </div>
-                    </td>
-
-                    <td>
-                      {p.policyType === 'motor' && p.vehicleDetails?.registrationNumber ? (
+                  return (
+                    <tr key={polId}>
+                      <td style={{ paddingLeft: '20px' }}>
                         <div>
-                          <div style={{ fontWeight: '700', fontSize: '13px' }}>
-                            {p.vehicleDetails.registrationNumber}
+                          <div style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--color-accent)' }}>
+                            {p.policyNumber || 'Draft'}
                           </div>
-                          <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                            {p.vehicleDetails.make} {p.vehicleDetails.model} {p.vehicleDetails.variant || ''}
+                          <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--color-text-main)', marginTop: '1px' }}>
+                            {insurer}
                           </div>
-                          {p.vehicleDetails.idv && (
-                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                              IDV: ₹{Number(p.vehicleDetails.idv).toLocaleString('en-IN')}
-                            </div>
-                          )}
+                          <span className="badge badge-neutral" style={{ fontSize: '10px', marginTop: '2px', textTransform: 'uppercase' }}>
+                            {lob}
+                          </span>
                         </div>
-                      ) : (
-                        <div>
-                          <div style={{ fontWeight: '500', fontSize: '13px' }}>
-                            {p.productName || p.planName || 'Comprehensive Coverage'}
-                          </div>
-                          {p.insuredMembers?.length > 0 && (
-                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                              {p.insuredMembers.length} Insured Lives
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </td>
+                      </td>
 
-                    <td>
-                      <div style={{ fontWeight: '700', color: 'var(--color-success)' }}>
-                        ₹ {premiumFormatted}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                        {p.premiumFrequency || 'yearly'} • Sum: {sumAssuredFormatted}
-                      </div>
-                    </td>
-
-                    <td>
-                      <div style={{ fontWeight: '600' }}>
-                        {renewalFormatted}
-                      </div>
-                      <div style={{ fontSize: '11px', marginTop: '2px' }}>
-                        {calculateDaysRemaining(p.renewalDate)}
-                      </div>
-                    </td>
-
-                    <td>
-                      <PolicyStatusBadge status={p.status} />
-                    </td>
-
-                    <td>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          title="Send WhatsApp Renewal Reminder"
-                          onClick={() => handleOpenWhatsapp(p)}
-                          style={{ color: '#25D366' }}
+                      <td>
+                        <div 
+                          style={{ fontWeight: '600', fontSize: '13px', color: custId ? 'var(--color-text-main)' : 'inherit', cursor: custId ? 'pointer' : 'default' }}
+                          onClick={() => custId && navigate(`/customers/${custId}`)}
                         >
-                          <MessageSquare size={14} />
-                        </button>
+                          {custName}
+                        </div>
+                        <div style={{ fontSize: '11.5px', color: 'var(--color-text-muted)' }}>
+                          {cust?.mobile || p.customerMobile || '—'}
+                        </div>
+                      </td>
 
-                        {p.originalDocumentUrl && (
-                          <a
-                            href={p.originalDocumentUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-secondary btn-sm"
-                            title="View Original S3 Policy PDF"
-                          >
-                            <FileText size={14} />
-                          </a>
+                      <td>
+                        {p.policyType === 'motor' && p.vehicleDetails?.registrationNumber ? (
+                          <div>
+                            <div style={{ fontWeight: '600', fontSize: '13px', color: 'var(--color-text-main)' }}>
+                              {p.vehicleDetails.registrationNumber}
+                            </div>
+                            <div style={{ fontSize: '11.5px', color: 'var(--color-text-muted)' }}>
+                              {p.vehicleDetails.make} {p.vehicleDetails.model}
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={{ fontSize: '12.5px', fontWeight: '500', color: 'var(--color-text-main)' }}>
+                              {p.productName || p.planName || 'Comprehensive Plan'}
+                            </div>
+                            {p.insuredMembers?.length > 0 && (
+                              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                                {p.insuredMembers.length} Insured Lives
+                              </div>
+                            )}
+                          </div>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+                      </td>
 
-      {/* Policy PDF AI OCR Upload Modal */}
+                      <td>
+                        <div style={{ fontSize: '12.5px', color: 'var(--color-text-body)' }}>
+                          {p.sumAssured ? formatINR(p.sumAssured) : '—'}
+                        </div>
+                      </td>
+
+                      <td>
+                        <div style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--color-text-main)' }}>
+                          {formatINR(prem)}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                          {p.premiumFrequency || 'Yearly'}
+                        </div>
+                      </td>
+
+                      <td>
+                        <div>
+                          <div style={{ fontSize: '12.5px', fontWeight: '500' }}>
+                            {p.renewalDate ? formatDate(p.renewalDate) : (p.endDate ? formatDate(p.endDate) : '—')}
+                          </div>
+                          {days !== null && (
+                            <span className={`badge ${days < 0 ? 'badge-danger' : days <= 7 ? 'badge-warning' : days <= 30 ? 'badge-warning' : 'badge-neutral'}`} style={{ fontSize: '10px', marginTop: '2px' }}>
+                              {days < 0 ? `Overdue ${Math.abs(days)}d` : days === 0 ? 'Due Today' : `${days}d left`}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      <td>
+                        <PolicyStatusBadge status={p.status} />
+                      </td>
+
+                      <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                        <div style={{ display: 'inline-flex', gap: '6px' }}>
+                          <button
+                            title="Send WhatsApp Renewal Notice"
+                            onClick={() => handleOpenWhatsapp(p)}
+                            style={{
+                              padding: '5px 8px',
+                              borderRadius: '6px',
+                              backgroundColor: '#25D366',
+                              color: '#ffffff',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <MessageSquare size={13} />
+                          </button>
+
+                          {p.originalDocumentUrl && (
+                            <a
+                              href={p.originalDocumentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: '5px 8px' }}
+                              title="Download S3 Policy PDF"
+                            >
+                              <FileText size={13} />
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
       <PolicyPdfUploadModal
         isOpen={isPdfModalOpen}
         onClose={() => setIsPdfModalOpen(false)}
         onSaveSuccess={() => fetchPolicies()}
       />
 
-      {/* Manual Policy Entry Modal */}
       <PolicyFormModal
         isOpen={isManualModalOpen}
         onClose={() => setIsManualModalOpen(false)}
         onSaveSuccess={() => fetchPolicies()}
       />
 
-      {/* WhatsApp Click-to-Chat Modal */}
-      <WhatsappPreviewModal
-        isOpen={!!whatsappCustomer}
-        onClose={() => { setWhatsappCustomer(null); setSelectedPolicyForWhatsapp(null); }}
-        customer={whatsappCustomer}
-        policy={selectedPolicyForWhatsapp}
-      />
+      {whatsappCustomer && (
+        <WhatsappPreviewModal
+          isOpen={!!whatsappCustomer}
+          onClose={() => { setWhatsappCustomer(null); setSelectedPolicyForWhatsapp(null); }}
+          customer={whatsappCustomer}
+          policy={selectedPolicyForWhatsapp}
+        />
+      )}
     </div>
   );
 };

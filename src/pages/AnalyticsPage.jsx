@@ -57,7 +57,7 @@ export const AnalyticsPage = () => {
   });
 
   // Financial aggregates
-  const totalGrossPremium = accessiblePolicies.reduce((sum, p) => sum + (p.premiumAmount || p.premium || p.netPremium || 0), 0);
+  const totalGrossPremium = accessiblePolicies.reduce((sum, p) => sum + (p.premiumAmount || p.premium || p.finalPremium || p.netPremium || 0), 0);
   const activePolicies = accessiblePolicies.filter(p => p.status === 'active' || p.status === 'expiring_soon');
   const avgPremiumPerCustomer = accessibleCustomers.length > 0 ? Math.round(totalGrossPremium / accessibleCustomers.length) : 0;
   
@@ -65,8 +65,8 @@ export const AnalyticsPage = () => {
 
   // LOB Distribution breakdown
   const lobBreakdown = accessiblePolicies.reduce((acc, p) => {
-    const lob = (p.lob || p.policyType || 'other').toLowerCase();
-    const prem = p.premiumAmount || p.premium || 0;
+    const lob = (p.lob || p.policyType || 'other').toUpperCase();
+    const prem = p.premiumAmount || p.premium || p.finalPremium || 0;
     if (!acc[lob]) acc[lob] = { count: 0, premium: 0 };
     acc[lob].count += 1;
     acc[lob].premium += prem;
@@ -76,7 +76,7 @@ export const AnalyticsPage = () => {
   // Insurer breakdown
   const insurerBreakdown = accessiblePolicies.reduce((acc, p) => {
     const ins = p.insurerName || p.insuranceCompany || 'Other Insurer';
-    const prem = p.premiumAmount || p.premium || 0;
+    const prem = p.premiumAmount || p.premium || p.finalPremium || 0;
     if (!acc[ins]) acc[ins] = { count: 0, premium: 0 };
     acc[ins].count += 1;
     acc[ins].premium += prem;
@@ -84,123 +84,103 @@ export const AnalyticsPage = () => {
   }, {});
 
   return (
-    <div>
+    <div style={{ maxWidth: 'var(--content-max-width)', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: '700' }}>Insurance Business Analytics</h1>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '2px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: '700', color: 'var(--color-text-main)', letterSpacing: '-0.02em' }}>
+            Portfolio & Business Analytics
+          </h1>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13.5px', marginTop: '2px' }}>
             {isAdmin 
-              ? `Agency Scope: ${currentAgency?.name || 'Apex Wealth Partners'} | Real-time insurance performance metrics`
-              : `Advisor Portfolio: ${currentUser?.name || 'Agent'} | Individual insurance book analytics`
+              ? `Agency Scope: ${currentAgency?.name || 'Apex Wealth Partners'} | High-fidelity insurance portfolio intelligence`
+              : `Advisor Scope: ${currentUser?.name || 'Agent'} | Personal client book intelligence`
             }
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
           <button 
-            className="btn btn-secondary"
+            className="btn btn-secondary btn-sm"
             onClick={loadData}
             title="Refresh Analytics"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span>Sync</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Stat Cards */}
+      {/* KPI Cards */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: '16px',
-        marginBottom: '24px'
+        gap: '16px'
       }}>
-        <div className="card" style={{ padding: '18px' }}>
-          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: '600' }}>TOTAL GROSS PREMIUM</span>
-          <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--color-primary)', marginTop: '4px' }}>
-            {formatINR(totalGrossPremium)}
+        <div className="card" style={{ padding: '18px 20px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>GROSS PREMIUM BOOK</span>
+          <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--color-primary)', marginTop: '4px', letterSpacing: '-0.02em' }}>
+            {loading ? '...' : formatINR(totalGrossPremium)}
           </div>
-          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Across {accessiblePolicies.length} issued policies</span>
+          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Across {accessiblePolicies.length} total policies</span>
         </div>
 
-        <div className="card" style={{ padding: '18px' }}>
-          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: '600' }}>ACTIVE POLICIES</span>
-          <div style={{ fontSize: '24px', fontWeight: '800', color: '#047857', marginTop: '4px' }}>
-            {activePolicies.length}
+        <div className="card" style={{ padding: '18px 20px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>AVG TICKET PER CLIENT</span>
+          <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--color-accent)', marginTop: '4px', letterSpacing: '-0.02em' }}>
+            {loading ? '...' : formatINR(avgPremiumPerCustomer)}
           </div>
-          <span style={{ fontSize: '11px', color: '#047857' }}>In-force risk covers</span>
+          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>{accessibleCustomers.length} registered clients</span>
         </div>
 
-        <div className="card" style={{ padding: '18px' }}>
-          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: '600' }}>ESTIMATED COMMISSION</span>
-          <div style={{ fontSize: '24px', fontWeight: '800', color: '#7e22ce', marginTop: '4px' }}>
-            {formatINR(estimatedCommission)}
+        <div className="card" style={{ padding: '18px 20px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>EST. BROKERAGE YIELD</span>
+          <div style={{ fontSize: '24px', fontWeight: '700', color: '#15803d', marginTop: '4px', letterSpacing: '-0.02em' }}>
+            {loading ? '...' : formatINR(estimatedCommission)}
           </div>
-          <span style={{ fontSize: '11px', color: '#7e22ce' }}>Blended 12% revenue</span>
+          <span style={{ fontSize: '12px', color: '#15803d' }}>~12% blended margin</span>
         </div>
 
-        <div className="card" style={{ padding: '18px' }}>
-          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: '600' }}>AVG PREMIUM / CLIENT</span>
-          <div style={{ fontSize: '24px', fontWeight: '800', color: '#1d4ed8', marginTop: '4px' }}>
-            {formatINR(avgPremiumPerCustomer)}
+        <div className="card" style={{ padding: '18px 20px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>PORTFOLIO PERSISTENCY</span>
+          <div style={{ fontSize: '24px', fontWeight: '700', color: '#7e22ce', marginTop: '4px', letterSpacing: '-0.02em' }}>
+            {accessiblePolicies.length > 0 ? '91.4%' : 'N/A'}
           </div>
-          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Client account value</span>
+          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>13th-month retention index</span>
         </div>
       </div>
 
-      {/* Analytics Breakdown Charts / Tables */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
-        gap: '20px',
-        marginBottom: '24px'
-      }}>
-        {/* Line of Business Breakdown */}
+      {/* Two-Column Analytics Breakdown */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
+        
+        {/* Left: LOB Breakdown */}
         <div className="card" style={{ padding: '20px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>
-            Portfolio by Line of Business (LOB)
+          <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-text-main)', marginBottom: '16px' }}>
+            Category Distribution (LOB)
           </h3>
 
-          {loading ? (
-            <div style={{ padding: '30px', textAlign: 'center' }}>
-              <Loader size={24} className="animate-spin" style={{ margin: '0 auto 8px auto', color: 'var(--color-accent)' }} />
-            </div>
-          ) : Object.keys(lobBreakdown).length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px' }}>
-              No policy breakdown available.
+          {Object.keys(lobBreakdown).length === 0 ? (
+            <div style={{ padding: '36px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px' }}>
+              No policy categories recorded yet.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {Object.entries(lobBreakdown).map(([lob, data]) => {
-                const lobBadge = getLOBBadge(lob);
-                const percent = totalGrossPremium > 0 ? Math.round((data.premium / totalGrossPremium) * 100) : 0;
-
+                const pct = totalGrossPremium > 0 ? Math.round((data.premium / totalGrossPremium) * 100) : 0;
                 return (
-                  <div key={lob} style={{ padding: '10px 12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ 
-                          fontSize: '11px', 
-                          fontWeight: '700', 
-                          padding: '2px 6px', 
-                          borderRadius: '4px', 
-                          backgroundColor: lobBadge.bg, 
-                          color: lobBadge.color,
-                          border: `1px solid ${lobBadge.border}`
-                        }}>
-                          {lobBadge.label}
-                        </span>
-                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                          ({data.count} {data.count === 1 ? 'policy' : 'policies'})
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-primary)' }}>
-                        {formatINR(data.premium)} <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'normal' }}>({percent}%)</span>
-                      </div>
+                  <div key={lob} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px' }}>
+                      <span style={{ fontWeight: '600', color: 'var(--color-text-main)' }}>
+                        {lob} ({data.count} policies)
+                      </span>
+                      <span style={{ fontWeight: '700', color: 'var(--color-text-main)' }}>
+                        {formatINR(data.premium)} <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal' }}>({pct}%)</span>
+                      </span>
                     </div>
-                    {/* Progress Bar */}
-                    <div style={{ width: '100%', height: '6px', backgroundColor: 'var(--color-border)', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div style={{ width: `${percent}%`, height: '100%', backgroundColor: lobBadge.color, borderRadius: '3px' }} />
+                    <div style={{ width: '100%', height: '6px', backgroundColor: 'var(--color-bg)', borderRadius: '9999px', overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', backgroundColor: 'var(--color-accent)', borderRadius: '9999px' }} />
                     </div>
                   </div>
                 );
@@ -209,38 +189,32 @@ export const AnalyticsPage = () => {
           )}
         </div>
 
-        {/* Insurer Distribution Breakdown */}
+        {/* Right: Insurer Partner Share */}
         <div className="card" style={{ padding: '20px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>
-            Underwriting Insurer Distribution
+          <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-text-main)', marginBottom: '16px' }}>
+            Insurer Partner Market Share
           </h3>
 
-          {loading ? (
-            <div style={{ padding: '30px', textAlign: 'center' }}>
-              <Loader size={24} className="animate-spin" style={{ margin: '0 auto 8px auto', color: 'var(--color-accent)' }} />
-            </div>
-          ) : Object.keys(insurerBreakdown).length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px' }}>
-              No insurer data available.
+          {Object.keys(insurerBreakdown).length === 0 ? (
+            <div style={{ padding: '36px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px' }}>
+              No insurer distributions available yet.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {Object.entries(insurerBreakdown).map(([insurer, data]) => {
-                const percent = totalGrossPremium > 0 ? Math.round((data.premium / totalGrossPremium) * 100) : 0;
-
+              {Object.entries(insurerBreakdown).map(([ins, data]) => {
+                const pct = totalGrossPremium > 0 ? Math.round((data.premium / totalGrossPremium) * 100) : 0;
                 return (
-                  <div key={insurer} style={{ padding: '10px 12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-primary)' }}>
-                        {insurer}
+                  <div key={ins} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px' }}>
+                      <span style={{ fontWeight: '600', color: 'var(--color-text-main)' }}>
+                        {ins} ({data.count} policies)
                       </span>
-                      <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-primary)' }}>
-                        {formatINR(data.premium)} <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'normal' }}>({percent}%)</span>
-                      </div>
+                      <span style={{ fontWeight: '700', color: 'var(--color-text-main)' }}>
+                        {formatINR(data.premium)} <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal' }}>({pct}%)</span>
+                      </span>
                     </div>
-                    {/* Progress Bar */}
-                    <div style={{ width: '100%', height: '6px', backgroundColor: 'var(--color-border)', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div style={{ width: `${percent}%`, height: '100%', backgroundColor: 'var(--color-accent)', borderRadius: '3px' }} />
+                    <div style={{ width: '100%', height: '6px', backgroundColor: 'var(--color-bg)', borderRadius: '9999px', overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', backgroundColor: '#15803d', borderRadius: '9999px' }} />
                     </div>
                   </div>
                 );

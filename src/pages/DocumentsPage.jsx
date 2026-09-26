@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, UploadCloud, Eye, CheckCircle2, FileSearch, Loader, RefreshCw, ExternalLink } from 'lucide-react';
+import { FileText, UploadCloud, Eye, CheckCircle2, FileSearch, Loader, RefreshCw, ExternalLink, Shield } from 'lucide-react';
 import { PolicyPdfUploadModal } from '../components/insurance/PolicyPdfUploadModal';
 import { apiClient } from '../api/client';
 import { useAgency } from '../context/AgencyContext';
 import { useAuth } from '../context/AuthContext';
+import { formatDate } from '../utils/formatters';
 
 export const DocumentsPage = () => {
   const navigate = useNavigate();
@@ -44,136 +45,169 @@ export const DocumentsPage = () => {
   }, [fetchDocuments]);
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    <div style={{ maxWidth: 'var(--content-max-width)', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: '700' }}>Centralized Document Vault & Policy PDFs</h1>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '2px' }}>
-            Secure AWS S3 document repository for original policy schedules, KYC proofs, and OCR extractions.
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: '700', color: 'var(--color-text-main)', letterSpacing: '-0.02em' }}>
+              Document Vault & Policy Schedules
+            </h1>
+            <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '9999px', backgroundColor: 'var(--color-accent-subtle)', color: 'var(--color-accent)', fontWeight: '700' }}>
+              {documents.length} Files
+            </span>
+          </div>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13.5px' }}>
+            Secure AWS S3 storage for Indian insurance policy PDF schedules, KYC proofs, and verified OCR extractions.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-secondary" onClick={fetchDocuments} title="Refresh vault">
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            className="btn btn-secondary btn-sm" 
+            onClick={fetchDocuments} 
+            title="Refresh vault"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span>Sync</span>
           </button>
           <button 
-            className="btn btn-primary" 
+            className="btn btn-primary btn-sm" 
             onClick={() => setIsPdfModalOpen(true)}
-            style={{ backgroundColor: '#2563eb' }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: 'var(--color-accent)'
+            }}
           >
-            <UploadCloud size={16} /> Upload Policy PDF (AI OCR)
+            <UploadCloud size={14} />
+            <span>Upload Policy PDF</span>
           </button>
         </div>
       </div>
 
-      <div className="table-container">
-        {loading && documents.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-            <Loader size={28} className="animate-spin" style={{ margin: '0 auto 12px' }} />
-            <p>Loading document vault from AWS storage...</p>
+      {/* Documents Table */}
+      {loading && documents.length === 0 ? (
+        <div className="card" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <Loader size={24} className="animate-spin" style={{ margin: '0 auto 10px auto', color: 'var(--color-accent)' }} />
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Loading document vault from AWS S3...</p>
+        </div>
+      ) : documents.length === 0 ? (
+        <div className="card" style={{ padding: '48px 24px', textAlign: 'center' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '12px',
+            backgroundColor: '#f1f5f9',
+            color: 'var(--color-text-muted)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 12px auto'
+          }}>
+            <FileText size={24} />
           </div>
-        ) : documents.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-            <FileText size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-            <p style={{ fontSize: '16px', fontWeight: '600' }}>No documents stored yet</p>
-            <p style={{ fontSize: '13px', marginTop: '4px' }}>
-              Upload your first policy schedule PDF to store it securely in AWS S3 and extract metadata.
-            </p>
-          </div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Document / File Name</th>
-                <th>Associated Customer</th>
-                <th>Attached Policy</th>
-                <th>Category</th>
-                <th>Verification State</th>
-                <th>Uploaded Date</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map(d => {
-                const cust = d.customerId;
-                const custName = cust?.name || 'Unassigned';
-                const custId = cust?._id || cust?.id;
-                const pol = d.policyId;
-                const uploadFormatted = d.createdAt ? new Date(d.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+          <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--color-text-main)' }}>No documents stored yet</h3>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: '4px', maxWidth: '400px', margin: '4px auto 16px auto' }}>
+            Upload your first policy schedule PDF to store it securely in AWS S3 and extract metadata automatically.
+          </p>
+          <button className="btn btn-primary btn-sm" onClick={() => setIsPdfModalOpen(true)}>
+            <UploadCloud size={14} /> Upload First PDF
+          </button>
+        </div>
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table" style={{ width: '100%', margin: 0 }}>
+              <thead>
+                <tr>
+                  <th style={{ paddingLeft: '20px' }}>Document Name</th>
+                  <th>Client</th>
+                  <th>Policy Number</th>
+                  <th>Category</th>
+                  <th>OCR Verification</th>
+                  <th>Upload Date</th>
+                  <th style={{ textAlign: 'right', paddingRight: '20px' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {documents.map(d => {
+                  const cust = d.customerId;
+                  const custName = cust?.name || 'Unassigned';
+                  const custId = cust?._id || cust?.id;
+                  const polNum = d.policyId?.policyNumber || d.policyNumber || '—';
+                  const isVerified = d.verificationState === 'verified';
 
-                return (
-                  <tr key={d._id || d.id}>
-                    <td>
-                      <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <FileText size={16} style={{ color: 'var(--color-accent)' }} />
-                        <span>{d.fileName}</span>
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginLeft: '24px' }}>
-                        Type: {d.fileType?.toUpperCase()} • {d.fileSize ? `${(d.fileSize / 1024).toFixed(1)} KB` : 'S3 Object'}
-                      </div>
-                    </td>
-
-                    <td>
-                      <div 
-                        style={{ fontWeight: '600', cursor: custId ? 'pointer' : 'default', color: custId ? 'var(--color-primary)' : 'inherit' }}
-                        onClick={() => custId && navigate(`/customers/${custId}`)}
-                      >
-                        {custName}
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                        {cust?.mobile || '—'}
-                      </div>
-                    </td>
-
-                    <td>
-                      {pol ? (
-                        <div>
-                          <div style={{ fontWeight: '600', color: 'var(--color-accent)' }}>{pol.policyNumber}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{pol.insuranceCompany}</div>
+                  return (
+                    <tr key={d._id || d.id}>
+                      <td style={{ paddingLeft: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <FileText size={16} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
+                          <span style={{ fontWeight: '600', fontSize: '13px', color: 'var(--color-text-main)' }}>
+                            {d.fileName}
+                          </span>
                         </div>
-                      ) : (
-                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>—</span>
-                      )}
-                    </td>
+                      </td>
 
-                    <td>
-                      <span className="badge badge-neutral" style={{ textTransform: 'capitalize' }}>
-                        {d.category || 'Policy Document'}
-                      </span>
-                    </td>
-
-                    <td>
-                      <span className={`badge ${d.verificationState === 'verified' || d.ocrConfirmed ? 'badge-success' : 'badge-warning'}`}>
-                        {d.verificationState === 'verified' || d.ocrConfirmed ? 'Verified & Saved' : (d.verificationState || 'Needs Review')}
-                      </span>
-                    </td>
-
-                    <td>{uploadFormatted}</td>
-
-                    <td>
-                      {d.blobUrl ? (
-                        <a
-                          href={d.blobUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn-secondary btn-sm"
-                          title="Open original file in S3"
+                      <td>
+                        <div 
+                          style={{ fontWeight: '500', fontSize: '12.5px', color: custId ? 'var(--color-text-main)' : 'var(--color-text-muted)', cursor: custId ? 'pointer' : 'default' }}
+                          onClick={() => custId && navigate(`/customers/${custId}`)}
                         >
-                          <Eye size={14} /> View File <ExternalLink size={12} />
-                        </a>
-                      ) : (
-                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Stored in S3</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+                          {custName}
+                        </div>
+                      </td>
 
+                      <td>
+                        <span style={{ fontWeight: '600', fontSize: '12.5px', color: 'var(--color-text-body)' }}>
+                          {polNum}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span className="badge badge-neutral" style={{ fontSize: '10.5px' }}>
+                          {d.category || 'Policy Schedule'}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span className={`badge ${isVerified ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '10.5px' }}>
+                          {d.verificationState || d.ocrStatus || 'Verified'}
+                        </span>
+                      </td>
+
+                      <td style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                        {d.createdAt ? formatDate(d.createdAt) : '—'}
+                      </td>
+
+                      <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                        {d.blobUrl ? (
+                          <a 
+                            href={d.blobUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="btn btn-secondary btn-sm"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
+                          >
+                            <Eye size={13} /> View File
+                          </a>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>Stored</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Policy PDF Modal */}
       <PolicyPdfUploadModal
         isOpen={isPdfModalOpen}
         onClose={() => setIsPdfModalOpen(false)}

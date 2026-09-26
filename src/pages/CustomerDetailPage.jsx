@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   User, Phone, Mail, MapPin, Calendar, CreditCard, Shield, 
-  FileText, CalendarCheck, MessageSquare, Activity, DollarSign, Plus, Eye, Loader, UploadCloud, RefreshCw
+  FileText, CalendarCheck, MessageSquare, Activity, DollarSign, Plus, Eye, Loader, UploadCloud, RefreshCw,
+  ArrowLeft, ChevronRight, CheckCircle2, AlertTriangle, ExternalLink
 } from 'lucide-react';
 import { Tabs } from '../components/common/Tabs';
 import { PolicyStatusBadge } from '../components/insurance/PolicyStatusBadge';
@@ -12,6 +13,7 @@ import { WhatsappPreviewModal } from '../components/whatsapp/WhatsappPreviewModa
 import { apiClient } from '../api/client';
 import { useAgency } from '../context/AgencyContext';
 import { useAuth } from '../context/AuthContext';
+import { formatINR, formatDate, getDaysRemaining, getLOBBadge } from '../utils/formatters';
 
 export const CustomerDetailPage = () => {
   const { id } = useParams();
@@ -88,19 +90,21 @@ export const CustomerDetailPage = () => {
 
   if (loading && !customer) {
     return (
-      <div style={{ padding: '60px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-        <Loader size={32} className="animate-spin" style={{ margin: '0 auto 16px' }} />
-        <p>Loading customer unified profile...</p>
+      <div style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+        <Loader size={28} className="animate-spin" style={{ margin: '0 auto 12px auto', color: 'var(--color-accent)' }} />
+        <p style={{ fontSize: '14px' }}>Loading client unified 360 profile...</p>
       </div>
     );
   }
 
   if (!customer) {
     return (
-      <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
-        <h3>Customer Not Found</h3>
-        <p style={{ color: 'var(--color-text-muted)', marginTop: '8px' }}>The requested customer record does not exist or has been removed.</p>
-        <button className="btn btn-primary" style={{ marginTop: '16px' }} onClick={() => navigate('/customers')}>
+      <div className="card" style={{ padding: '48px 24px', textAlign: 'center', maxWidth: '500px', margin: '40px auto' }}>
+        <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-text-main)' }}>Client Record Not Found</h3>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '13.5px', marginTop: '8px' }}>
+          The requested customer record does not exist or has been removed from this agency.
+        </p>
+        <button className="btn btn-primary" style={{ marginTop: '20px' }} onClick={() => navigate('/customers')}>
           Back to Directory
         </button>
       </div>
@@ -108,14 +112,15 @@ export const CustomerDetailPage = () => {
   }
 
   const tabs = [
-    { id: 'overview', label: 'Customer Profile' },
+    { id: 'overview', label: 'Overview & Profile' },
     { id: 'insurance', label: 'Insurance Policies', count: policies.length },
     { id: 'documents', label: 'Document Vault', count: documents.length },
     { id: 'followups', label: 'Renewal Follow-ups', count: followups.length }
   ];
 
-  const totalPremium = policies.reduce((acc, p) => acc + (p.premium || p.finalPremium || 0), 0);
+  const totalPremium = policies.reduce((acc, p) => acc + (p.premium || p.premiumAmount || p.finalPremium || 0), 0);
   const activePoliciesCount = policies.filter(p => p.status === 'active' || p.status === 'expiring_soon').length;
+  const initials = customer.name ? customer.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'C';
 
   const handleOpenWhatsapp = (policy = null) => {
     setSelectedPolicyForWhatsapp(policy || policies[0] || null);
@@ -123,61 +128,164 @@ export const CustomerDetailPage = () => {
   };
 
   return (
-    <div>
-      {/* Customer Header Banner */}
-      <div className="card" style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+    <div style={{ maxWidth: 'var(--content-max-width)', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      
+      {/* Navigation Breadcrumb */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button 
+          onClick={() => navigate('/customers')}
+          style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: 'var(--color-text-muted)', fontWeight: '500' }}
+        >
+          <ArrowLeft size={14} />
+          <span>Customers</span>
+        </button>
+        <ChevronRight size={13} style={{ color: 'var(--color-text-light)' }} />
+        <span style={{ fontSize: '13px', color: 'var(--color-text-main)', fontWeight: '600' }}>
+          {customer.name}
+        </span>
+      </div>
+
+      {/* Customer 360 Header Card */}
+      <div className="card" style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '20px' }}>
+          
+          {/* Avatar & Core Profile */}
+          <div style={{ display: 'flex', gap: '18px', alignItems: 'center' }}>
             <div style={{
-              width: '56px',
-              height: '56px',
+              width: '60px',
+              height: '60px',
               borderRadius: '50%',
-              backgroundColor: 'var(--color-accent-light)',
+              backgroundColor: '#eff6ff',
               color: 'var(--color-accent)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: '700',
-              fontSize: '22px'
+              fontSize: '22px',
+              flexShrink: 0
             }}>
-              {customer.name?.charAt(0) || 'C'}
+              {initials}
             </div>
+
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <h1 style={{ fontSize: '22px', fontWeight: '700' }}>{customer.name}</h1>
-                <span className="badge badge-info">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <h1 style={{ fontSize: '22px', fontWeight: '700', color: 'var(--color-text-main)', letterSpacing: '-0.02em' }}>
+                  {customer.name}
+                </h1>
+                <span className="badge badge-info" style={{ fontSize: '11px' }}>
                   Agent: {customer.assignedAgentName || customer.assignedAgentId?.name || 'Assigned Agent'}
                 </span>
                 {customer.customerType && (
-                  <span className="badge badge-neutral" style={{ textTransform: 'capitalize' }}>
+                  <span className="badge badge-neutral" style={{ textTransform: 'capitalize', fontSize: '11px' }}>
                     {customer.customerType}
                   </span>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '4px', flexWrap: 'wrap' }}>
-                <span><Phone size={14} style={{ verticalAlign: 'middle' }} /> {customer.mobile}</span>
-                <span><Mail size={14} style={{ verticalAlign: 'middle' }} /> {customer.email || '—'}</span>
-                <span><CreditCard size={14} style={{ verticalAlign: 'middle' }} /> PAN: {customer.pan || '—'}</span>
-                <span><MapPin size={14} style={{ verticalAlign: 'middle' }} /> {customer.city ? `${customer.city}, ${customer.state || ''}` : 'India'}</span>
+
+              {/* Contact Chips */}
+              <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '8px', flexWrap: 'wrap' }}>
+                {customer.mobile && (
+                  <a href={`tel:${customer.mobile}`} style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--color-text-body)' }}>
+                    <Phone size={13} style={{ color: 'var(--color-text-light)' }} /> {customer.mobile}
+                  </a>
+                )}
+                {customer.email && (
+                  <a href={`mailto:${customer.email}`} style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--color-text-body)' }}>
+                    <Mail size={13} style={{ color: 'var(--color-text-light)' }} /> {customer.email}
+                  </a>
+                )}
+                {customer.pan && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <CreditCard size={13} style={{ color: 'var(--color-text-light)' }} /> PAN: <strong style={{ color: 'var(--color-text-main)' }}>{customer.pan}</strong>
+                  </span>
+                )}
+                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <MapPin size={13} style={{ color: 'var(--color-text-light)' }} /> {customer.city ? `${customer.city}${customer.state ? `, ${customer.state}` : ''}` : 'India'}
+                </span>
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          {/* Header Action Buttons */}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button 
+              className="btn btn-primary btn-sm"
+              onClick={() => setIsPdfModalOpen(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: 'var(--color-accent)'
+              }}
+            >
+              <UploadCloud size={14} />
+              <span>Upload Policy PDF</span>
+            </button>
+
+            <button 
+              onClick={() => handleOpenWhatsapp()}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: '#25D366',
+                color: '#ffffff',
+                fontSize: '12.5px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <MessageSquare size={14} />
+              <span>WhatsApp</span>
+            </button>
+
             <button 
               className="btn btn-secondary btn-sm"
-              onClick={() => setIsPdfModalOpen(true)}
-              style={{ backgroundColor: '#2563eb', color: '#fff' }}
+              onClick={() => setIsManualPolicyModalOpen(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <UploadCloud size={14} /> Upload Policy PDF (AI OCR)
+              <Plus size={14} />
+              <span>Add Policy</span>
             </button>
-            <button 
-              className="btn btn-primary btn-sm" 
-              onClick={() => handleOpenWhatsapp()} 
-              style={{ backgroundColor: '#25D366' }}
-            >
-              <MessageSquare size={14} /> WhatsApp
-            </button>
+          </div>
+        </div>
+
+        {/* Quick KPI Strip inside Card */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: '12px',
+          marginTop: '20px',
+          paddingTop: '18px',
+          borderTop: '1px solid var(--color-border)'
+        }}>
+          <div style={{ padding: '12px 14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Active Policies</span>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-accent)', marginTop: '2px' }}>
+              {activePoliciesCount}
+            </div>
+          </div>
+
+          <div style={{ padding: '12px 14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Annual Premium</span>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-success)', marginTop: '2px' }}>
+              {formatINR(totalPremium)}
+            </div>
+          </div>
+
+          <div style={{ padding: '12px 14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Documents in Vault</span>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-text-main)', marginTop: '2px' }}>
+              {documents.length}
+            </div>
+          </div>
+
+          <div style={{ padding: '12px 14px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Follow-ups</span>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: followups.length > 0 ? '#b45309' : 'var(--color-text-main)', marginTop: '2px' }}>
+              {followups.length}
+            </div>
           </div>
         </div>
       </div>
@@ -187,70 +295,136 @@ export const CustomerDetailPage = () => {
 
       {/* Tab 1: Overview */}
       {activeTab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          <div className="card">
-            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Demographic & KYC Information</h3>
-            <div style={{ fontSize: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div><strong>DOB:</strong> {customer.dob ? new Date(customer.dob).toLocaleDateString('en-IN') : '—'}</div>
-              <div><strong>Gender:</strong> <span style={{ textTransform: 'capitalize' }}>{customer.gender || '—'}</span></div>
-              <div><strong>PAN Card:</strong> <code style={{ backgroundColor: 'var(--color-bg)', padding: '2px 6px', borderRadius: '4px' }}>{customer.pan || '—'}</code></div>
-              <div><strong>Aadhaar Number:</strong> {customer.aadhaar || '—'}</div>
-              <div><strong>Occupation:</strong> {customer.occupation || '—'}</div>
-              <div><strong>Annual Income:</strong> ₹ {(customer.annualIncome || customer.income || 0).toLocaleString('en-IN')}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
+          
+          {/* Demographic & KYC */}
+          <div className="card" style={{ padding: '20px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-text-main)', marginBottom: '16px' }}>
+              Demographic & KYC Information
+            </h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', fontSize: '13px' }}>
               <div>
-                <strong>Residential Address:</strong><br />
-                {typeof customer.address === 'object' ? `${customer.address?.street || ''}, ${customer.address?.city || customer.city || ''} ${customer.address?.state || customer.state || ''} - ${customer.address?.pincode || customer.pincode || ''}` : customer.address || '—'}
+                <span style={{ fontSize: '11.5px', color: 'var(--color-text-muted)', display: 'block' }}>Date of Birth</span>
+                <strong style={{ color: 'var(--color-text-main)' }}>{customer.dob ? formatDate(customer.dob) : '—'}</strong>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '11.5px', color: 'var(--color-text-muted)', display: 'block' }}>Gender</span>
+                <strong style={{ color: 'var(--color-text-main)', textTransform: 'capitalize' }}>{customer.gender || '—'}</strong>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '11.5px', color: 'var(--color-text-muted)', display: 'block' }}>PAN Card</span>
+                <code style={{ backgroundColor: 'var(--color-bg)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px', fontWeight: '600' }}>
+                  {customer.pan || '—'}
+                </code>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '11.5px', color: 'var(--color-text-muted)', display: 'block' }}>Aadhaar</span>
+                <strong style={{ color: 'var(--color-text-main)' }}>{customer.aadhaar || '—'}</strong>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '11.5px', color: 'var(--color-text-muted)', display: 'block' }}>Occupation</span>
+                <strong style={{ color: 'var(--color-text-main)' }}>{customer.occupation || '—'}</strong>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '11.5px', color: 'var(--color-text-muted)', display: 'block' }}>Annual Income</span>
+                <strong style={{ color: 'var(--color-text-main)' }}>{customer.annualIncome ? formatINR(customer.annualIncome) : '—'}</strong>
               </div>
             </div>
 
-            <h4 style={{ fontSize: '14px', fontWeight: '600', marginTop: '18px', marginBottom: '8px' }}>Nominee Information</h4>
-            {customer.nominee?.name ? (
-              <div style={{ fontSize: '13px', padding: '10px 12px', backgroundColor: 'var(--color-bg)', borderRadius: '6px' }}>
-                <div><strong>Name:</strong> {customer.nominee.name}</div>
-                <div><strong>Relationship:</strong> {customer.nominee.relation || 'Nominee'}</div>
-                <div><strong>Share:</strong> {customer.nominee.share || 100}%</div>
-              </div>
-            ) : (
-              <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>No nominee specified</div>
-            )}
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
+              <span style={{ fontSize: '11.5px', color: 'var(--color-text-muted)', display: 'block' }}>Residential Address</span>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-body)', marginTop: '4px', lineHeight: 1.4 }}>
+                {typeof customer.address === 'object' 
+                  ? `${customer.address?.street || ''}, ${customer.address?.city || customer.city || ''} ${customer.address?.state || customer.state || ''} - ${customer.address?.pincode || customer.pincode || ''}` 
+                  : customer.address || '—'
+                }
+              </p>
+            </div>
+
+            {/* Nominee Details */}
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
+              <h4 style={{ fontSize: '13.5px', fontWeight: '600', color: 'var(--color-text-main)', marginBottom: '8px' }}>Nominee Information</h4>
+              {customer.nominee?.name ? (
+                <div style={{ padding: '10px 12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', fontSize: '12.5px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <strong style={{ color: 'var(--color-text-main)' }}>{customer.nominee.name}</strong>
+                    <span className="badge badge-neutral" style={{ fontSize: '10.5px' }}>{customer.nominee.relation || 'Nominee'}</span>
+                  </div>
+                  <div style={{ color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                    Share: {customer.nominee.share || 100}%
+                  </div>
+                </div>
+              ) : (
+                <span style={{ fontSize: '12.5px', color: 'var(--color-text-muted)' }}>No nominee registered</span>
+              )}
+            </div>
           </div>
 
-          <div className="card">
-            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Insurance Portfolio Summary</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-              <div style={{ padding: '14px', backgroundColor: 'var(--color-bg)', borderRadius: '6px' }}>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Active Policies</div>
-                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--color-accent)' }}>
-                  {activePoliciesCount}
-                </div>
-              </div>
-              <div style={{ padding: '14px', backgroundColor: 'var(--color-bg)', borderRadius: '6px' }}>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Total Annual Premium</div>
-                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--color-success)' }}>
-                  ₹ {totalPremium.toLocaleString('en-IN')}
-                </div>
-              </div>
-            </div>
+          {/* Right: Portfolio Snapshot */}
+          <div className="card" style={{ padding: '20px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-text-main)', marginBottom: '14px' }}>
+              Attached Insurance Policies
+            </h3>
 
-            <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '10px' }}>Upcoming Renewals</h4>
             {policies.length === 0 ? (
-              <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>No policies currently active</div>
+              <div style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                <Shield size={28} style={{ margin: '0 auto 8px auto', color: 'var(--color-text-light)' }} />
+                <p style={{ fontSize: '13px' }}>No policies attached yet.</p>
+                <button 
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setIsPdfModalOpen(true)}
+                  style={{ marginTop: '12px', fontSize: '12px' }}
+                >
+                  <UploadCloud size={13} /> Upload Policy PDF
+                </button>
+              </div>
             ) : (
-              policies.map(p => {
-                const renewalStr = p.renewalDate ? new Date(p.renewalDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-                return (
-                  <div key={p._id || p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', padding: '8px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
-                    <div>
-                      <div style={{ fontWeight: '600' }}>{p.insuranceCompany}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{p.policyNumber} ({p.subLob || p.policyType})</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {policies.map(p => {
+                  const days = getDaysRemaining(p.renewalDate || p.endDate);
+                  const insurer = p.insuranceCompany || p.insurerName || 'Insurer';
+                  const prem = p.premiumAmount || p.premium || p.finalPremium || 0;
+
+                  return (
+                    <div 
+                      key={p._id || p.id}
+                      style={{
+                        padding: '12px 14px',
+                        backgroundColor: 'var(--color-bg)',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--color-border)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          {insurer}
+                        </div>
+                        <div style={{ fontSize: '11.5px', color: 'var(--color-text-muted)' }}>
+                          {p.policyNumber} • {p.policyType || 'General'}
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-text-main)' }}>
+                          {formatINR(prem)}
+                        </div>
+                        <span className={`badge ${days !== null && days <= 30 ? 'badge-warning' : 'badge-neutral'}`} style={{ fontSize: '10px' }}>
+                          {days !== null ? (days <= 0 ? 'Due' : `${days}d left`) : 'Active'}
+                        </span>
+                      </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: '700', color: 'var(--color-warning)' }}>{renewalStr}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-success)' }}>₹ {(p.premium || 0).toLocaleString('en-IN')}</div>
-                    </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
@@ -258,12 +432,14 @@ export const CustomerDetailPage = () => {
 
       {/* Tab 2: Insurance Policies */}
       {activeTab === 'insurance' && (
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Attached Insurance Policies</h3>
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-text-main)' }}>
+              Insurance Policies ({policies.length})
+            </h3>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn btn-primary btn-sm" onClick={() => setIsPdfModalOpen(true)} style={{ backgroundColor: '#2563eb' }}>
-                <UploadCloud size={14} /> Upload Policy PDF (AI OCR)
+              <button className="btn btn-primary btn-sm" onClick={() => setIsPdfModalOpen(true)} style={{ backgroundColor: 'var(--color-accent)' }}>
+                <UploadCloud size={14} /> Upload Policy PDF
               </button>
               <button className="btn btn-secondary btn-sm" onClick={() => setIsManualPolicyModalOpen(true)}>
                 <Plus size={14} /> Add Policy
@@ -271,191 +447,231 @@ export const CustomerDetailPage = () => {
             </div>
           </div>
 
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Policy Number</th>
-                <th>Insurer</th>
-                <th>Category & Plan</th>
-                <th>Sum Assured</th>
-                <th>Premium (INR)</th>
-                <th>Renewal Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {policies.length === 0 ? (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table" style={{ width: '100%', margin: 0 }}>
+              <thead>
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '32px', color: 'var(--color-text-muted)' }}>
-                    No insurance policies attached yet. Click "+ Upload Policy PDF (AI OCR)" above.
-                  </td>
+                  <th style={{ paddingLeft: '20px' }}>Policy Number</th>
+                  <th>Insurer</th>
+                  <th>Category</th>
+                  <th>Sum Assured</th>
+                  <th>Annual Premium</th>
+                  <th>Renewal Date</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right', paddingRight: '20px' }}>Actions</th>
                 </tr>
-              ) : (
-                policies.map(p => {
-                  const polId = p._id || p.id;
-                  const renewalFormatted = p.renewalDate ? new Date(p.renewalDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-                  const premiumFormatted = (p.premium || p.finalPremium || 0).toLocaleString('en-IN');
+              </thead>
+              <tbody>
+                {policies.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)', fontSize: '13px' }}>
+                      No insurance policies attached yet. Click "+ Upload Policy PDF" above.
+                    </td>
+                  </tr>
+                ) : (
+                  policies.map(p => {
+                    const polId = p._id || p.id;
+                    const days = getDaysRemaining(p.renewalDate || p.endDate);
+                    const prem = p.premiumAmount || p.premium || p.finalPremium || 0;
 
-                  return (
-                    <tr key={polId}>
-                      <td style={{ fontWeight: '700', color: 'var(--color-accent)' }}>
-                        {p.policyNumber}
-                      </td>
-                      <td style={{ fontWeight: '500' }}>{p.insuranceCompany}</td>
-                      <td>
-                        <span style={{ textTransform: 'capitalize', fontWeight: '600' }}>{p.policyType}</span>
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                          {p.vehicleDetails?.registrationNumber ? `${p.vehicleDetails.registrationNumber} (${p.vehicleDetails.make} ${p.vehicleDetails.model})` : (p.productName || p.planName || 'Comprehensive')}
-                        </div>
-                      </td>
-                      <td>{p.sumAssured ? `₹ ${(p.sumAssured).toLocaleString('en-IN')}` : '—'}</td>
-                      <td style={{ fontWeight: '700', color: 'var(--color-success)' }}>
-                        ₹ {premiumFormatted}
-                      </td>
-                      <td style={{ fontWeight: '600' }}>{renewalFormatted}</td>
-                      <td><PolicyStatusBadge status={p.status} /></td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button 
-                            className="btn btn-secondary btn-sm" 
-                            title="Send WhatsApp Renewal Notice"
-                            onClick={() => handleOpenWhatsapp(p)}
-                            style={{ color: '#25D366' }}
-                          >
-                            <MessageSquare size={14} />
-                          </button>
-                          {p.originalDocumentUrl && (
-                            <a
-                              href={p.originalDocumentUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="btn btn-secondary btn-sm"
-                              title="Download Original S3 Policy PDF"
+                    return (
+                      <tr key={polId}>
+                        <td style={{ paddingLeft: '20px', fontWeight: '700', color: 'var(--color-accent)' }}>
+                          {p.policyNumber}
+                        </td>
+                        <td style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>
+                          {p.insuranceCompany || p.insurerName || '—'}
+                        </td>
+                        <td>
+                          <span className="badge badge-neutral" style={{ textTransform: 'uppercase', fontSize: '10.5px' }}>
+                            {p.policyType || 'HEALTH'}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: '12.5px', color: 'var(--color-text-body)' }}>
+                          {p.sumAssured ? formatINR(p.sumAssured) : '—'}
+                        </td>
+                        <td style={{ fontWeight: '700', color: 'var(--color-text-main)' }}>
+                          {formatINR(prem)}
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '12.5px', fontWeight: '500' }}>
+                            {p.renewalDate ? formatDate(p.renewalDate) : (p.endDate ? formatDate(p.endDate) : '—')}
+                          </span>
+                        </td>
+                        <td>
+                          <PolicyStatusBadge status={p.status} />
+                        </td>
+                        <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                          <div style={{ display: 'inline-flex', gap: '6px' }}>
+                            <button 
+                              title="Send WhatsApp Renewal Notice"
+                              onClick={() => handleOpenWhatsapp(p)}
+                              style={{
+                                padding: '5px 8px',
+                                borderRadius: '6px',
+                                backgroundColor: '#25D366',
+                                color: '#ffffff',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
                             >
-                              <FileText size={14} />
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                              <MessageSquare size={13} />
+                            </button>
+                            {p.originalDocumentUrl && (
+                              <a
+                                href={p.originalDocumentUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-secondary btn-sm"
+                                style={{ padding: '5px 8px' }}
+                                title="Download S3 Policy PDF"
+                              >
+                                <FileText size={13} />
+                              </a>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {/* Tab 3: Centralized Document Vault */}
       {activeTab === 'documents' && (
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Customer Centralized Document Vault</h3>
-            <button className="btn btn-primary btn-sm" onClick={() => setIsPdfModalOpen(true)} style={{ backgroundColor: '#2563eb' }}>
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-text-main)' }}>
+              Document Vault ({documents.length})
+            </h3>
+            <button className="btn btn-primary btn-sm" onClick={() => setIsPdfModalOpen(true)} style={{ backgroundColor: 'var(--color-accent)' }}>
               <UploadCloud size={14} /> Upload Policy PDF to S3
             </button>
           </div>
 
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Document Name</th>
-                <th>Category</th>
-                <th>Verification State</th>
-                <th>Uploaded Date</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.length === 0 ? (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table" style={{ width: '100%', margin: 0 }}>
+              <thead>
                 <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', padding: '32px', color: 'var(--color-text-muted)' }}>
-                    No documents uploaded yet for this customer.
-                  </td>
+                  <th style={{ paddingLeft: '20px' }}>Document Name</th>
+                  <th>Category</th>
+                  <th>OCR Verification</th>
+                  <th>Uploaded Date</th>
+                  <th style={{ textAlign: 'right', paddingRight: '20px' }}>Action</th>
                 </tr>
-              ) : (
-                documents.map(d => (
-                  <tr key={d._id || d.id}>
-                    <td style={{ fontWeight: '600' }}>{d.fileName}</td>
-                    <td><span className="badge badge-neutral">{d.category}</span></td>
-                    <td>
-                      <span className={`badge ${d.verificationState === 'verified' ? 'badge-success' : 'badge-warning'}`}>
-                        {d.verificationState || d.ocrStatus || 'Verified'}
-                      </span>
-                    </td>
-                    <td>{d.createdAt ? new Date(d.createdAt).toLocaleDateString('en-IN') : '—'}</td>
-                    <td>
-                      {d.blobUrl ? (
-                        <a 
-                          href={d.blobUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="btn btn-secondary btn-sm"
-                        >
-                          <Eye size={14} /> View File
-                        </a>
-                      ) : (
-                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Stored</span>
-                      )}
+              </thead>
+              <tbody>
+                {documents.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)', fontSize: '13px' }}>
+                      No documents stored in vault yet.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  documents.map(d => (
+                    <tr key={d._id || d.id}>
+                      <td style={{ paddingLeft: '20px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                        {d.fileName}
+                      </td>
+                      <td>
+                        <span className="badge badge-neutral">{d.category || 'Policy Document'}</span>
+                      </td>
+                      <td>
+                        <span className={`badge ${d.verificationState === 'verified' ? 'badge-success' : 'badge-warning'}`}>
+                          {d.verificationState || 'Verified'}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: '12.5px', color: 'var(--color-text-muted)' }}>
+                        {d.createdAt ? formatDate(d.createdAt) : '—'}
+                      </td>
+                      <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                        {d.blobUrl ? (
+                          <a 
+                            href={d.blobUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="btn btn-secondary btn-sm"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <Eye size={13} /> View File
+                          </a>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>Stored</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {/* Tab 4: Renewal Follow-ups */}
       {activeTab === 'followups' && (
-        <div className="card">
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>Renewal Reminders & Tasks</h3>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Task / Reminder</th>
-                <th>Due Date</th>
-                <th>Type</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {followups.length === 0 ? (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-text-main)' }}>
+              Renewal Reminders & Follow-ups ({followups.length})
+            </h3>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table" style={{ width: '100%', margin: 0 }}>
+              <thead>
                 <tr>
-                  <td colSpan="4" style={{ textAlign: 'center', padding: '32px', color: 'var(--color-text-muted)' }}>
-                    No pending renewal follow-ups for this customer.
-                  </td>
+                  <th style={{ paddingLeft: '20px' }}>Task Description</th>
+                  <th>Due Date</th>
+                  <th>Type</th>
+                  <th>Status</th>
                 </tr>
-              ) : (
-                followups.map(f => (
-                  <tr key={f._id || f.id}>
-                    <td style={{ fontWeight: '500' }}>{f.notes || 'Automated Policy Renewal Reminder'}</td>
-                    <td style={{ fontWeight: '600' }}>
-                      {f.dueDate ? new Date(f.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                    </td>
-                    <td><span className="badge badge-info">{f.type || 'Renewal'}</span></td>
-                    <td>
-                      <span className={`badge ${f.status === 'completed' ? 'badge-success' : 'badge-warning'}`}>
-                        {f.status || 'Pending'}
-                      </span>
+              </thead>
+              <tbody>
+                {followups.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)', fontSize: '13px' }}>
+                      No active renewal follow-ups for this customer.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  followups.map(f => (
+                    <tr key={f._id || f.id}>
+                      <td style={{ paddingLeft: '20px', fontWeight: '500', color: 'var(--color-text-main)' }}>
+                        {f.notes || 'Automated Policy Renewal Reminder'}
+                      </td>
+                      <td style={{ fontWeight: '600', fontSize: '12.5px' }}>
+                        {f.dueDate ? formatDate(f.dueDate) : '—'}
+                      </td>
+                      <td><span className="badge badge-info">{f.type || 'Renewal'}</span></td>
+                      <td>
+                        <span className={`badge ${f.status === 'completed' ? 'badge-success' : 'badge-warning'}`}>
+                          {f.status || 'Pending'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      {/* Policy PDF AI OCR Modal */}
+      {/* Modals */}
       <PolicyPdfUploadModal
         isOpen={isPdfModalOpen}
         onClose={() => setIsPdfModalOpen(false)}
         onSaveSuccess={() => loadData()}
       />
 
-      {/* Manual Policy Entry Modal */}
       <PolicyFormModal
         isOpen={isManualPolicyModalOpen}
         onClose={() => setIsManualPolicyModalOpen(false)}
@@ -463,13 +679,14 @@ export const CustomerDetailPage = () => {
         onSaveSuccess={() => loadData()}
       />
 
-      {/* WhatsApp Modal */}
-      <WhatsappPreviewModal
-        isOpen={whatsappModal}
-        onClose={() => setWhatsappModal(false)}
-        customer={customer}
-        policy={selectedPolicyForWhatsapp}
-      />
+      {whatsappModal && (
+        <WhatsappPreviewModal
+          isOpen={whatsappModal}
+          onClose={() => setWhatsappModal(false)}
+          customer={customer}
+          policy={selectedPolicyForWhatsapp}
+        />
+      )}
     </div>
   );
 };
