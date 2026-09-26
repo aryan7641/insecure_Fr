@@ -29,10 +29,13 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
   const [classification, setClassification] = useState(null);
   const [isChangingSubtype, setIsChangingSubtype] = useState(false);
   const [documentId, setDocumentId] = useState(null);
-  const [blobUrl, setBlobUrl] = useState(null);
+  const [blobUrl, setBlobUrl] = useState(null); // kept for reference, NOT used in iframe directly
+  const [presignedPdfUrl, setPresignedPdfUrl] = useState(null); // short-lived presigned S3 URL for PDF viewer
+  const [isFetchingPdfUrl, setIsFetchingPdfUrl] = useState(false);
   const [duplicateCandidates, setDuplicateCandidates] = useState({ customers: [], policies: [] });
   const [selectedCustomerAction, setSelectedCustomerAction] = useState('create_new');
   const [selectedExistingCustomerId, setSelectedExistingCustomerId] = useState('');
+
 
   // Active Tab in Review Right Panel
   const [activeTab, setActiveTab] = useState('customer'); // 'customer' | 'policy' | 'coverage' | 'premium' | 'members' | 'motor' | 'nominee'
@@ -154,6 +157,28 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
 
   const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id') || '6ab7424622537587efc9ef30';
 
+  /**
+   * Fetches a short-lived presigned URL from backend to display the PDF in the browser.
+   * This keeps the S3 bucket private — no direct public S3 URL is ever used in the iframe.
+   */
+  const fetchPresignedPdfUrl = async (docId) => {
+    if (!docId) return;
+    setIsFetchingPdfUrl(true);
+    try {
+      const res = await apiClient.get(`/agencies/${agencyId}/ocr/${docId}/view-url`);
+      const urlData = res.data?.data || res.data || res;
+      if (urlData?.url) {
+        setPresignedPdfUrl(urlData.url);
+      }
+    } catch (err) {
+      console.warn('[PolicyPdfUploadModal] Could not fetch presigned PDF URL:', err.message);
+      // Non-fatal: PDF preview just won't show, form data still accessible
+    } finally {
+      setIsFetchingPdfUrl(false);
+    }
+  };
+
+
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -184,10 +209,16 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
       const res = await apiClient.post(`/agencies/${agencyId}/ocr/extract-pdf`, formData);
       const data = res.data?.data || res.data || res;
       
-      setDocumentId(data.documentId);
-      setBlobUrl(data.blobUrl);
-      setClassification(data.classification || {});
+      const newDocId = data.documentId;
+      setDocumentId(newDocId);
+      setBlobUrl(data.blobUrl || null); // stored for reference only
+      setClassification(data.classification || null);
       setDuplicateCandidates(data.duplicateCandidates || { customers: [], policies: [] });
+
+      // Fetch presigned URL for secure PDF viewing — never use raw S3 blobUrl in iframe
+      if (newDocId) {
+        fetchPresignedPdfUrl(newDocId);
+      }
 
       const ext = data.extractedData || {};
       const extCust = ext.customer || {};
@@ -248,7 +279,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
       });
 
       setPolicyData({
-        insurer: extPol.insurer?.value || 'Tata AIG General Insurance',
+        insurer: extPol.insurer?.value || '',
         productName: extPol.productName?.value || '',
         planName: extPol.planName?.value || '',
         policyNumber: extPol.policyNumber?.value || '',
@@ -451,6 +482,8 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
     setSelectedFile(null);
     setDocumentId(null);
     setBlobUrl(null);
+    setPresignedPdfUrl(null);
+    setIsFetchingPdfUrl(false);
     setClassification(null);
     onClose();
   };
@@ -634,9 +667,9 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
           {/* Classification & Subtype Banner */}
           <div style={{
             padding: '10px 16px',
-            backgroundColor: '#f0f9ff',
+            backgroundColor: classification?.isValid ? '#f0f9ff' : '#fafafa',
             borderRadius: 'var(--radius-md)',
-            border: '1px solid #bae6fd',
+            border: `1px solid ${classification?.isValid ? '#bae6fd' : '#e2e8f0'}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -644,15 +677,24 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
             gap: '10px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="badge badge-info" style={{ fontWeight: '700', fontSize: '11px' }}>
-                {classification?.detectedInsurer || policyData.insurer}
-              </span>
+              {/* Only show insurer badge if it was actually detected */}
+              {classification?.detectedInsurer && classification.detectedInsurer !== 'General Insurance' && (
+                <span className="badge badge-info" style={{ fontWeight: '700', fontSize: '11px' }}>
+                  {classification.detectedInsurer}
+                </span>
+              )}
               <span style={{ fontSize: '13px', color: '#0369a1', fontWeight: '600' }}>
-                Detected Subtype: <strong>{currentSubtypeConfig?.subtypeName || selectedSubtype}</strong>
+                {classification?.isValid
+                  ? <>Detected Subtype: <strong>{currentSubtypeConfig?.subtypeName || selectedSubtype}</strong></>
+                  : <span style={{ color: '#64748b' }}>Classification pending — please verify subtype</span>
+                }
               </span>
-              <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                ({Math.round((classification?.confidence || 0.9) * 100)}% confidence)
-              </span>
+              {/* Only show confidence when classification is valid and has real data */}
+              {classification?.isValid && typeof classification?.confidence === 'number' && (
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                  ({Math.round(classification.confidence * 100)}% confidence)
+                </span>
+              )}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -761,27 +803,34 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                 <span style={{ fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '240px' }}>
                   {selectedFile?.name || 'Policy Document.pdf'}
                 </span>
-                {blobUrl && (
-                  <a href={blobUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px' }}>
-                    <ExternalLink size={12} /> Open Full S3 PDF
+                {presignedPdfUrl && (
+                  <a href={presignedPdfUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px' }}>
+                    <ExternalLink size={12} /> Open PDF
                   </a>
                 )}
               </div>
 
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', backgroundColor: '#334155' }}>
-                {blobUrl ? (
+                {isFetchingPdfUrl ? (
+                  <div style={{ textAlign: 'center', color: '#94a3b8' }}>
+                    <Loader size={28} className="animate-spin" style={{ margin: '0 auto 8px auto' }} />
+                    <p style={{ fontSize: '13px' }}>Loading secure PDF preview...</p>
+                  </div>
+                ) : presignedPdfUrl ? (
                   <iframe
-                    src={blobUrl}
+                    src={presignedPdfUrl}
                     title="PDF Preview"
                     style={{ width: '100%', height: '100%', border: 'none', borderRadius: '4px', backgroundColor: '#ffffff' }}
                   />
                 ) : (
                   <div style={{ textAlign: 'center', color: '#94a3b8' }}>
                     <FileText size={36} style={{ margin: '0 auto 8px auto' }} />
-                    <p style={{ fontSize: '13px' }}>Document Preview Ready</p>
+                    <p style={{ fontSize: '13px' }}>PDF preview unavailable</p>
+                    <p style={{ fontSize: '11px', marginTop: '4px', color: '#64748b' }}>Form data is still fully populated below</p>
                   </div>
                 )}
               </div>
+
             </div>
 
             {/* Right: Subtype-Specific Categorized Tabs & Form */}
