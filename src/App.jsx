@@ -10,13 +10,17 @@ import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { CustomerDetailPage } from './pages/CustomerDetailPage';
+import { LeadsPage } from './pages/LeadsPage';
 import { InsurancePage } from './pages/InsurancePage';
-import { MutualFundsPage } from './pages/MutualFundsPage';
+import { RenewalsPage } from './pages/RenewalsPage';
 import { FollowupsPage } from './pages/FollowupsPage';
 import { DocumentsPage } from './pages/DocumentsPage';
+import { CommissionsPage } from './pages/CommissionsPage';
+import { LedgerPage } from './pages/LedgerPage';
+import { ReportsPage } from './pages/ReportsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
-import { ImportsPage } from './pages/ImportsPage';
 import { ActivityPage } from './pages/ActivityPage';
+import { TeamPage } from './pages/TeamPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 const ProtectedRoute = ({ children }) => {
@@ -44,14 +48,25 @@ export default function App() {
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="customers" element={<CustomersPage />} />
                 <Route path="customers/:id" element={<CustomerDetailPage />} />
+                <Route path="leads" element={<LeadsPage />} />
                 <Route path="insurance" element={<InsurancePage />} />
-                <Route path="mutual-funds" element={<MutualFundsPage />} />
+                <Route path="policies" element={<InsurancePage />} />
+                <Route path="renewals" element={<RenewalsPage />} />
                 <Route path="followups" element={<FollowupsPage />} />
+                <Route path="follow-ups" element={<FollowupsPage />} />
                 <Route path="documents" element={<DocumentsPage />} />
+                <Route path="commissions" element={<CommissionsPage />} />
+                <Route path="ledger" element={<LedgerPage />} />
+                <Route path="reports" element={<ReportsPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
-                <Route path="imports" element={<ImportsPage />} />
                 <Route path="activity" element={<ActivityPage />} />
+                <Route path="team" element={<TeamPage />} />
+                <Route path="agents" element={<TeamPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+
+                {/* Legacy / Mutual Funds redirect */}
+                <Route path="mutual-funds" element={<Navigate to="/insurance" replace />} />
+                <Route path="imports" element={<Navigate to="/documents" replace />} />
               </Route>
 
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

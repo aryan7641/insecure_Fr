@@ -1,8 +1,9 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  LayoutDashboard, Users, Shield, TrendingUp, CalendarCheck, 
-  FileText, BarChart3, UploadCloud, Activity, Settings, UserCheck
+  LayoutDashboard, Users, UserPlus, Shield, RefreshCw, CalendarCheck, 
+  FileText, Percent, BookOpen, FileSpreadsheet, BarChart3, Activity, 
+  UserCheck, Settings
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -12,12 +13,17 @@ export const Sidebar = () => {
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { label: 'Customers', path: '/customers', icon: Users },
-    { label: 'Insurance Policies', path: '/insurance', icon: Shield },
-    { label: 'Follow-ups & Renewals', path: '/followups', icon: CalendarCheck },
+    { label: 'Leads', path: '/leads', icon: UserPlus },
+    { label: 'Policies', path: '/insurance', icon: Shield },
+    { label: 'Renewals', path: '/renewals', icon: RefreshCw },
+    { label: 'Follow-ups', path: '/followups', icon: CalendarCheck },
     { label: 'Document Vault', path: '/documents', icon: FileText },
+    { label: 'Commissions', path: '/commissions', icon: Percent },
+    { label: 'Ledger', path: '/ledger', icon: BookOpen },
+    { label: 'Reports', path: '/reports', icon: FileSpreadsheet },
     { label: 'Analytics', path: '/analytics', icon: BarChart3 },
-    { label: 'Imports', path: '/imports', icon: UploadCloud },
     { label: 'Activity Logs', path: '/activity', icon: Activity },
+    { label: 'Agents & Team', path: '/team', icon: UserCheck, adminOnly: true },
     { label: 'Settings', path: '/settings', icon: Settings, adminOnly: true }
   ];
 
@@ -65,95 +71,100 @@ export const Sidebar = () => {
 
       {/* Role Toggle Banner */}
       <div style={{
-        padding: '12px 16px',
-        margin: '12px',
+        padding: '10px 14px',
+        margin: '10px 12px 4px 12px',
         backgroundColor: 'var(--color-bg)',
         borderRadius: 'var(--radius-sm)',
         border: '1px solid var(--color-border)',
         fontSize: '12px'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-          <span style={{ color: 'var(--color-text-muted)', fontWeight: '600' }}>Role View:</span>
+          <span style={{ color: 'var(--color-text-muted)', fontWeight: '600' }}>Active Role:</span>
           <span className={`badge ${isAdmin ? 'badge-info' : 'badge-neutral'}`}>
-            {currentUser?.role}
+            {isAdmin ? 'ADMIN' : 'AGENT'}
           </span>
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
           <button 
             className={`btn btn-sm ${isAdmin ? 'btn-primary' : 'btn-secondary'}`}
             style={{ flex: 1, fontSize: '11px', padding: '2px 4px' }}
-            onClick={() => switchRole('Admin')}
+            onClick={() => switchRole('admin')}
           >
-            Admin
+            Admin View
           </button>
           <button 
             className={`btn btn-sm ${!isAdmin ? 'btn-primary' : 'btn-secondary'}`}
             style={{ flex: 1, fontSize: '11px', padding: '2px 4px' }}
-            onClick={() => switchRole('Agent')}
+            onClick={() => switchRole('agent')}
           >
-            Agent
+            Agent View
           </button>
         </div>
       </div>
 
       {/* Navigation Items */}
       <nav style={{ flex: 1, padding: '8px 12px', overflowY: 'auto' }}>
-        {navItems.map(item => {
-          if (item.adminOnly && !isAdmin) return null;
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '10px 14px',
-                fontSize: '14px',
-                fontWeight: isActive ? '600' : '500',
-                color: isActive ? 'var(--color-accent)' : 'var(--color-text-main)',
-                backgroundColor: isActive ? 'var(--color-accent-light)' : 'transparent',
-                borderRadius: 'var(--radius-sm)',
-                marginBottom: '4px',
-                transition: 'all 0.15s ease'
-              })}
-            >
-              <Icon size={18} />
-              <span>{item.label}</span>
-            </NavLink>
-          );
-        })}
+        <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {navItems.map((item) => {
+            if (item.adminOnly && !isAdmin) return null;
+            const Icon = item.icon;
+
+            return (
+              <li key={item.path}>
+                <NavLink
+                  to={item.path}
+                  style={({ isActive }) => ({
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '13px',
+                    fontWeight: isActive ? '600' : '500',
+                    color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                    backgroundColor: isActive ? 'var(--color-surface-hover)' : 'transparent',
+                    borderLeft: isActive ? '3px solid var(--color-accent)' : '3px solid transparent',
+                    transition: 'all 0.15s ease'
+                  })}
+                >
+                  <Icon size={16} color={({ isActive }) => isActive ? 'var(--color-accent)' : 'currentColor'} />
+                  <span>{item.label}</span>
+                </NavLink>
+              </li>
+            );
+          })}
+        </ul>
       </nav>
 
       {/* User Footer */}
       <div style={{
-        padding: '16px',
+        padding: '12px 16px',
         borderTop: '1px solid var(--color-border)',
         display: 'flex',
         alignItems: 'center',
-        gap: '12px'
+        gap: '10px'
       }}>
         <div style={{
-          width: '36px',
-          height: '36px',
+          width: '32px',
+          height: '32px',
           borderRadius: '50%',
-          backgroundColor: '#e2e8f0',
+          backgroundColor: 'var(--color-accent)',
+          color: '#ffffff',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontWeight: '600',
-          color: 'var(--color-primary)'
+          fontSize: '13px'
         }}>
-          {currentUser?.name.charAt(0)}
+          {currentUser?.name?.charAt(0) || 'U'}
         </div>
-        <div style={{ overflow: 'hidden' }}>
-          <div style={{ fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-            {currentUser?.name}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <p style={{ fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+            {currentUser?.name || 'Insurance Agent'}
+          </p>
+          <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
             {currentUser?.email}
-          </div>
+          </p>
         </div>
       </div>
     </aside>
