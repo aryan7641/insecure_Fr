@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAgency } from '../context/AgencyContext';
 import { apiClient } from '../api/client';
 import { formatINR, formatDate, getDaysRemaining, getLOBBadge } from '../utils/formatters';
+import { getSubtypeConfig } from '../schemas/insuranceTaxonomy';
 
 export const InsurancePage = () => {
   const navigate = useNavigate();
@@ -23,6 +24,7 @@ export const InsurancePage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
+  const [subtypeFilter, setSubtypeFilter] = useState('ALL');
   const [expiringFilter, setExpiringFilter] = useState('ALL');
 
   // Modals
@@ -61,7 +63,7 @@ export const InsurancePage = () => {
     };
   }, [fetchPolicies]);
 
-  // Filter policies based on role, search, status, type, and renewal window
+  // Filter policies based on role, search, status, type, subtype, and renewal window
   const displayedPolicies = policies.filter(p => {
     // RBAC: Agents see only their assigned policies
     const agentId = p.assignedAgentId?._id || p.assignedAgentId?.id || p.assignedAgentId;
@@ -74,8 +76,14 @@ export const InsurancePage = () => {
 
     // Type / LOB filter
     if (typeFilter !== 'ALL') {
-      const polLob = (p.lob || p.policyType || '').toLowerCase();
-      if (polLob !== typeFilter.toLowerCase()) return false;
+      const polType = (p.insuranceType || p.lob || p.policyType || '').toLowerCase();
+      if (polType !== typeFilter.toLowerCase()) return false;
+    }
+
+    // Subtype filter
+    if (subtypeFilter !== 'ALL') {
+      const polSubtype = (p.insuranceSubtype || '').toLowerCase();
+      if (polSubtype !== subtypeFilter.toLowerCase()) return false;
     }
 
     // Search query
@@ -124,7 +132,7 @@ export const InsurancePage = () => {
             </span>
           </div>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '13.5px' }}>
-            Multi-insurer portfolio spanning Health, Motor, Life, Term, Travel, Home, and Commercial policies.
+            Multi-insurer portfolio spanning Health (8 Subtypes), Motor (3 Subtypes), Life (9 Subtypes), and General (2 Subtypes).
           </p>
         </div>
 
@@ -166,7 +174,7 @@ export const InsurancePage = () => {
 
       {/* Filter Toolbar */}
       <div className="card" style={{ padding: '12px 16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 260px', position: 'relative' }}>
+        <div style={{ flex: '1 1 240px', position: 'relative' }}>
           <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
           <input
             type="text"
@@ -180,24 +188,72 @@ export const InsurancePage = () => {
 
         <select
           className="select"
-          style={{ width: '160px', fontSize: '13px' }}
+          style={{ width: '140px', fontSize: '13px' }}
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
+          onChange={(e) => {
+            setTypeFilter(e.target.value);
+            setSubtypeFilter('ALL');
+          }}
         >
-          <option value="ALL">All Lines (LOB)</option>
+          <option value="ALL">All Types</option>
           <option value="health">Health</option>
           <option value="motor">Motor</option>
-          <option value="term">Term</option>
           <option value="life">Life</option>
-          <option value="travel">Travel</option>
-          <option value="home">Home</option>
-          <option value="commercial">Commercial</option>
           <option value="general">General</option>
         </select>
 
+        {typeFilter !== 'ALL' && (
+          <select
+            className="select"
+            style={{ width: '160px', fontSize: '13px' }}
+            value={subtypeFilter}
+            onChange={(e) => setSubtypeFilter(e.target.value)}
+          >
+            <option value="ALL">All Subtypes</option>
+            {typeFilter === 'health' && (
+              <>
+                <option value="individual_health">Individual Health</option>
+                <option value="family_floater">Family Floater</option>
+                <option value="senior_citizen_health">Senior Citizen</option>
+                <option value="group_health">Group Health (GMC)</option>
+                <option value="critical_illness">Critical Illness</option>
+                <option value="top_up">Top-up</option>
+                <option value="super_top_up">Super Top-up</option>
+                <option value="personal_accident">Personal Accident</option>
+              </>
+            )}
+            {typeFilter === 'motor' && (
+              <>
+                <option value="car">Car (4-Wheeler)</option>
+                <option value="two_wheeler">Two-Wheeler</option>
+                <option value="commercial_vehicle">Commercial Vehicle</option>
+              </>
+            )}
+            {typeFilter === 'life' && (
+              <>
+                <option value="term">Term Insurance</option>
+                <option value="term_return_of_premium">TROP</option>
+                <option value="whole_life">Whole Life</option>
+                <option value="endowment">Endowment</option>
+                <option value="money_back">Money Back</option>
+                <option value="ulip">ULIP</option>
+                <option value="child_insurance">Child Plan</option>
+                <option value="pension_annuity">Pension / Annuity</option>
+                <option value="group_life">Group Life</option>
+              </>
+            )}
+            {typeFilter === 'general' && (
+              <>
+                <option value="travel">Travel Insurance</option>
+                <option value="home_property">Home / Property</option>
+              </>
+            )}
+          </select>
+        )}
+
         <select
           className="select"
-          style={{ width: '140px', fontSize: '13px' }}
+          style={{ width: '130px', fontSize: '13px' }}
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
@@ -210,7 +266,7 @@ export const InsurancePage = () => {
 
         <select
           className="select"
-          style={{ width: '160px', fontSize: '13px' }}
+          style={{ width: '150px', fontSize: '13px' }}
           value={expiringFilter}
           onChange={(e) => setExpiringFilter(e.target.value)}
         >
@@ -287,9 +343,23 @@ export const InsurancePage = () => {
                           <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--color-text-main)', marginTop: '1px' }}>
                             {insurer}
                           </div>
-                          <span className="badge badge-neutral" style={{ fontSize: '10px', marginTop: '2px', textTransform: 'uppercase' }}>
-                            {lob}
-                          </span>
+                          <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                            <span className="badge badge-neutral" style={{ fontSize: '9.5px', textTransform: 'uppercase', padding: '1px 5px' }}>
+                              {lob}
+                            </span>
+                            {p.insuranceSubtype && (
+                              <span style={{
+                                fontSize: '9.5px',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                                color: '#4f46e5',
+                                fontWeight: '600'
+                              }}>
+                                {getSubtypeConfig(p.insuranceSubtype)?.name || p.insuranceSubtype}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
 

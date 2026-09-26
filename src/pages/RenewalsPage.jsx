@@ -10,6 +10,7 @@ import { useAgency } from '../context/AgencyContext';
 import { apiClient } from '../api/client';
 import { WhatsappPreviewModal } from '../components/whatsapp/WhatsappPreviewModal';
 import { formatINR, formatDate, getDaysRemaining, getLOBBadge } from '../utils/formatters';
+import { getSubtypeConfig } from '../schemas/insuranceTaxonomy';
 
 export const RenewalsPage = () => {
   const navigate = useNavigate();
@@ -288,7 +289,7 @@ export const RenewalsPage = () => {
               >
                 {/* Customer & Policy Details */}
                 <div style={{ flex: 2, minWidth: '280px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                     <span style={{ 
                       fontSize: '10.5px', 
                       fontWeight: '700', 
@@ -301,6 +302,19 @@ export const RenewalsPage = () => {
                     }}>
                       {lob.label}
                     </span>
+
+                    {policy.insuranceSubtype && (
+                      <span style={{
+                        fontSize: '10px',
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        color: '#4f46e5',
+                        fontWeight: '600'
+                      }}>
+                        {getSubtypeConfig(policy.insuranceSubtype)?.name || policy.insuranceSubtype}
+                      </span>
+                    )}
 
                     <span
                       onClick={() => custId && navigate(`/customers/${custId}`)}
