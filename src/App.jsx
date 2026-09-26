@@ -6,6 +6,7 @@ import { ToastProvider } from './context/ToastContext';
 
 import { MainLayout } from './components/layout/MainLayout';
 import { LoginPage } from './pages/LoginPage';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { CustomerDetailPage } from './pages/CustomerDetailPage';
@@ -32,6 +33,7 @@ export default function App() {
           <ToastProvider>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
               <Route path="/" element={
                 <ProtectedRoute>
