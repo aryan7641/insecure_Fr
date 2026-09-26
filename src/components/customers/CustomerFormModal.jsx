@@ -175,6 +175,25 @@ export const CustomerFormModal = ({ isOpen, onClose, onSaveSuccess }) => {
             </div>
 
             <div className="form-group">
+              <label className="form-label">Gender</label>
+              <select name="gender" className="form-select" value={formData.gender || 'male'} onChange={handleChange}>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Customer Profile Type</label>
+              <select name="customerType" className="form-select" value={formData.customerType || 'individual'} onChange={handleChange}>
+                <option value="individual">Individual</option>
+                <option value="corporate">Corporate / SME</option>
+                <option value="hni">HNI Customer</option>
+                <option value="retail">Retail</option>
+              </select>
+            </div>
+
+            <div className="form-group">
               <label className="form-label">PAN Card Number</label>
               <input type="text" name="pan" className="form-input" value={formData.pan} onChange={handleChange} placeholder="e.g. ABCPS1234F" style={{ textTransform: 'uppercase' }} />
             </div>
@@ -185,8 +204,18 @@ export const CustomerFormModal = ({ isOpen, onClose, onSaveSuccess }) => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Occupation</label>
-              <input type="text" name="occupation" className="form-input" value={formData.occupation} onChange={handleChange} placeholder="e.g. Software Architect" />
+              <label className="form-label">City</label>
+              <input type="text" name="city" className="form-input" value={formData.city || ''} onChange={handleChange} placeholder="e.g. Mumbai" />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">State</label>
+              <input type="text" name="state" className="form-input" value={formData.state || ''} onChange={handleChange} placeholder="e.g. Maharashtra" />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Pincode</label>
+              <input type="text" name="pincode" className="form-input" value={formData.pincode || ''} onChange={handleChange} placeholder="6-digit Pincode" />
             </div>
 
             <div className="form-group">

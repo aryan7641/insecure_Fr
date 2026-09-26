@@ -1,46 +1,137 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, Shield, AlertTriangle, CalendarX, TrendingUp, Calendar, 
-  FileText, Clock, AlertCircle, UserPlus, Activity 
+  FileText, Clock, AlertCircle, UserPlus, UploadCloud, MessageSquare, Loader, ArrowUpRight
 } from 'lucide-react';
 import { StatCard } from '../components/common/StatCard';
-import { MOCK_CUSTOMERS, MOCK_POLICIES, MOCK_SIPS, MOCK_FOLLOWUPS, MOCK_DOCUMENTS, MOCK_ACTIVITY } from '../api/mockData';
+import { PolicyPdfUploadModal } from '../components/insurance/PolicyPdfUploadModal';
+import { WhatsappPreviewModal } from '../components/whatsapp/WhatsappPreviewModal';
 import { useAuth } from '../context/AuthContext';
 import { useAgency } from '../context/AgencyContext';
+import { apiClient } from '../api/client';
 
 export const DashboardPage = () => {
   const navigate = useNavigate();
   const { currentUser, isAdmin } = useAuth();
   const { currentAgency } = useAgency();
 
-  // Filter based on role (Admin sees all in agency, Agent sees assigned)
-  const customers = isAdmin ? MOCK_CUSTOMERS : MOCK_CUSTOMERS.filter(c => c.assignedAgentId === currentUser?.id);
-  const policies = isAdmin ? MOCK_POLICIES : MOCK_POLICIES.filter(p => p.assignedAgentName === currentUser?.name);
-  const sips = isAdmin ? MOCK_SIPS : MOCK_SIPS.filter(s => s.assignedAgentName === currentUser?.name);
-  const followups = isAdmin ? MOCK_FOLLOWUPS : MOCK_FOLLOWUPS.filter(f => f.assignedAgentId === currentUser?.id);
-  const documents = MOCK_DOCUMENTS;
+  const [policies, setPolicies] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [followups, setFollowups] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [whatsappCustomer, setWhatsappCustomer] = useState(null);
+  const [selectedPolicyForWhatsapp, setSelectedPolicyForWhatsapp] = useState(null);
+
+  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id') || '6ab7424622537587efc9ef30';
+
+  const loadDashboardData = useCallback(async () => {
+    if (!agencyId) return;
+    setLoading(true);
+    try {
+      // 1. Fetch Customers
+      const custRes = await apiClient.get(`/agencies/${agencyId}/customers`);
+      const custItems = custRes?.data?.customers || custRes?.data?.data || custRes?.data || [];
+      if (Array.isArray(custItems)) setCustomers(custItems);
+
+      // 2. Fetch Policies
+      const polRes = await apiClient.get(`/agencies/${agencyId}/insurance-policies`);
+      const polItems = polRes?.data?.policies || polRes?.data?.data || polRes?.data || [];
+      if (Array.isArray(polItems)) setPolicies(polItems);
+
+      // 3. Fetch Follow-ups
+      const fuRes = await apiClient.get(`/agencies/${agencyId}/follow-ups`);
+      const fuItems = fuRes?.data?.followUps || fuRes?.data?.data || fuRes?.data || [];
+      if (Array.isArray(fuItems)) setFollowups(fuItems);
+    } catch (err) {
+      console.warn('Failed to load dashboard data:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [agencyId]);
+
+  useEffect(() => {
+    loadDashboardData();
+
+    const handleSync = () => loadDashboardData();
+    window.addEventListener('policyCreated', handleSync);
+    window.addEventListener('customerCreated', handleSync);
+    return () => {
+      window.removeEventListener('policyCreated', handleSync);
+      window.removeEventListener('customerCreated', handleSync);
+    };
+  }, [loadDashboardData]);
+
+  // Role filtering
+  const filteredPolicies = policies.filter(p => {
+    if (isAdmin) return true;
+    const agentId = p.assignedAgentId?._id || p.assignedAgentId?.id || p.assignedAgentId;
+    return agentId === (currentUser?._id || currentUser?.id);
+  });
+
+  const filteredCustomers = customers.filter(c => {
+    if (isAdmin) return true;
+    const agentId = c.assignedAgentId?._id || c.assignedAgentId?.id || c.assignedAgentId;
+    return agentId === (currentUser?._id || currentUser?.id);
+  });
 
   // KPI Calculations
-  const expiringSoonCount = policies.filter(p => p.status === 'Expiring Soon').length;
-  const overdueRenewalsCount = followups.filter(f => f.type === 'Renewal' && f.status === 'Overdue').length;
-  const dueTodayCount = followups.filter(f => f.dueDate === '2026-09-24').length;
-  const overdueFollowupsCount = followups.filter(f => f.status === 'Overdue').length;
-  const pendingDocsCount = documents.filter(d => d.status === 'Pending Verification').length;
+  const activePolicies = filteredPolicies.filter(p => p.status === 'active' || p.status === 'expiring_soon');
+  
+  const expiringSoonPolicies = filteredPolicies.filter(p => {
+    if (p.status === 'expiring_soon') return true;
+    if (!p.renewalDate) return false;
+    const diffDays = Math.ceil((new Date(p.renewalDate) - new Date()) / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 && diffDays <= 30;
+  });
+
+  const totalPremiumValue = activePolicies.reduce((acc, p) => acc + (p.premium || p.finalPremium || 0), 0);
+  const pendingFollowupsCount = followups.filter(f => f.status === 'pending').length;
+
+  const handleOpenWhatsapp = (policy) => {
+    const cust = policy.customerId || { name: policy.customerName, mobile: policy.customerMobile };
+    setWhatsappCustomer(cust);
+    setSelectedPolicyForWhatsapp(policy);
+  };
 
   return (
     <div>
       {/* Top Banner */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: '700' }}>Executive Dashboard</h1>
+          <h1 style={{ fontSize: '24px', fontWeight: '700' }}>Insurance Executive Dashboard</h1>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '2px' }}>
-            Agency: <strong>{currentAgency.name}</strong> | Role Context: <strong>{currentUser?.role}</strong>
+            Agency: <strong>{currentAgency.name || 'Apex Wealth Partners'}</strong> | Role View: <strong>{currentUser?.role || 'Admin'}</strong>
           </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button 
+            className="btn btn-secondary" 
+            onClick={loadDashboardData}
+            title="Refresh metrics"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <button 
+            className="btn btn-primary"
+            onClick={() => setIsPdfModalOpen(true)}
+            style={{ backgroundColor: '#2563eb' }}
+          >
+            <UploadCloud size={16} /> Upload Policy PDF (AI OCR)
+          </button>
+          <button 
+            className="btn btn-secondary"
+            onClick={() => navigate('/customers')}
+          >
+            <UserPlus size={16} /> Add Customer
+          </button>
         </div>
       </div>
 
-      {/* 11 Primary KPI Grid */}
+      {/* KPI Stats Grid */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -50,174 +141,189 @@ export const DashboardPage = () => {
         {/* 1. Total Customers */}
         <StatCard
           title="Total Customers"
-          value={customers.length}
+          value={filteredCustomers.length}
           subtext="Unified Profiles"
           icon={Users}
           color="accent"
           onClick={() => navigate('/customers')}
         />
 
-        {/* 2. Active Policies */}
+        {/* 2. Active Insurance Policies */}
         <StatCard
           title="Active Policies"
-          value={policies.filter(p => p.status === 'Active' || p.status === 'Expiring Soon').length}
-          subtext="Insurance Portfolio"
+          value={activePolicies.length}
+          subtext="Covered Lives & Assets"
           icon={Shield}
           color="info"
           onClick={() => navigate('/insurance')}
         />
 
-        {/* 3. Policies Expiring Soon (30 days) */}
+        {/* 3. Expiring Within 30 Days */}
         <StatCard
-          title="Policies Expiring Soon"
-          value={expiringSoonCount}
-          subtext="Within 30 Days"
+          title="Expiring in 30 Days"
+          value={expiringSoonPolicies.length}
+          subtext="Requires Immediate Renewal"
           icon={AlertTriangle}
           color="warning"
-          onClick={() => navigate('/insurance?filter=expiring_soon')}
+          onClick={() => navigate('/insurance')}
         />
 
-        {/* 4. Overdue Renewals */}
+        {/* 4. Total Annual Premium Portfolio */}
         <StatCard
-          title="Overdue Renewals"
-          value={overdueRenewalsCount}
-          subtext="Requires Action"
-          icon={CalendarX}
-          color="danger"
-          onClick={() => navigate('/followups?filter=overdue')}
-        />
-
-        {/* 5. Total SIPs */}
-        <StatCard
-          title="Active SIPs"
-          value={sips.length}
-          subtext="Mutual Funds"
+          title="Annual Premium"
+          value={`₹ ${totalPremiumValue.toLocaleString('en-IN')}`}
+          subtext="Total GWP Managed (INR)"
           icon={TrendingUp}
           color="success"
-          onClick={() => navigate('/mutual-funds?tab=sips')}
+          onClick={() => navigate('/insurance')}
         />
 
-        {/* 6. Upcoming SIP Dates */}
+        {/* 5. Pending Renewal Follow-ups */}
         <StatCard
-          title="Upcoming SIP Dates"
-          value={sips.length}
-          subtext="Due Next 10 Days"
-          icon={Calendar}
-          color="info"
-          onClick={() => navigate('/mutual-funds?tab=sips')}
-        />
-
-        {/* 7. Documents Pending */}
-        <StatCard
-          title="Documents Pending"
-          value={pendingDocsCount}
-          subtext="OCR / Verification"
-          icon={FileText}
-          color="warning"
-          onClick={() => navigate('/documents?filter=pending')}
-        />
-
-        {/* 8. Follow-ups Due Today */}
-        <StatCard
-          title="Follow-ups Due Today"
-          value={dueTodayCount}
-          subtext="Scheduled Today"
+          title="Renewal Tasks"
+          value={pendingFollowupsCount}
+          subtext="Pending Follow-ups"
           icon={Clock}
           color="accent"
-          onClick={() => navigate('/followups?filter=today')}
-        />
-
-        {/* 9. Follow-ups Overdue */}
-        <StatCard
-          title="Follow-ups Overdue"
-          value={overdueFollowupsCount}
-          subtext="Action Required"
-          icon={AlertCircle}
-          color="danger"
-          onClick={() => navigate('/followups?filter=overdue')}
-        />
-
-        {/* 10. New Customers */}
-        <StatCard
-          title="New Customers"
-          value={customers.length}
-          subtext="Added This Month"
-          icon={UserPlus}
-          color="success"
-          onClick={() => navigate('/customers')}
+          onClick={() => navigate('/followups')}
         />
       </div>
 
-      {/* Lower Dashboard Grid: Urgent Renewals & Recent Activity */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '20px' }}>
-        {/* Urgent Expiring Policies List */}
+      {/* Urgent Renewals & Portfolio Breakdown */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '20px' }}>
+        {/* Urgent Expiring Policies */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Policies Expiring Soon (30-Day Window)</h3>
-            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/insurance')}>View All</button>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Policies Expiring Soon (Action Watchlist)</h3>
+              <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Policies requiring renewal reminders in the next 30 days</p>
+            </div>
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/insurance')}>View All Policies</button>
           </div>
 
           <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Policy #</th>
-                  <th>Customer</th>
-                  <th>Insurer</th>
-                  <th>Renewal Date</th>
-                  <th>Premium</th>
-                </tr>
-              </thead>
-              <tbody>
-                {policies.filter(p => p.status === 'Expiring Soon').map(p => (
-                  <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/customers/${p.customerId}?tab=insurance`)}>
-                    <td style={{ fontWeight: '600' }}>{p.policyNumber}</td>
-                    <td>{p.customerName}</td>
-                    <td>{p.company}</td>
-                    <td><span style={{ color: 'var(--color-warning)', fontWeight: '600' }}>{p.renewalDate}</span></td>
-                    <td>₹ {p.premium.toLocaleString('en-IN')}</td>
+            {expiringSoonPolicies.length === 0 ? (
+              <div style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                <Shield size={32} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
+                <p style={{ fontSize: '14px', fontWeight: '600' }}>No policies expiring in the next 30 days</p>
+                <p style={{ fontSize: '12px' }}>All policies are current and up to date.</p>
+              </div>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Policy #</th>
+                    <th>Customer</th>
+                    <th>Insurer & Plan</th>
+                    <th>Renewal Date</th>
+                    <th>Premium</th>
+                    <th>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {expiringSoonPolicies.slice(0, 6).map(p => {
+                    const cust = p.customerId;
+                    const custName = cust?.name || p.customerName || 'Customer';
+                    const renewalStr = p.renewalDate ? new Date(p.renewalDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+                    const daysRemaining = p.renewalDate ? Math.ceil((new Date(p.renewalDate) - new Date()) / (1000 * 60 * 60 * 24)) : 0;
+
+                    return (
+                      <tr key={p._id || p.id}>
+                        <td style={{ fontWeight: '700', color: 'var(--color-accent)' }}>
+                          {p.policyNumber}
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: '600' }}>{custName}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{cust?.mobile || p.customerMobile || '—'}</div>
+                        </td>
+                        <td>
+                          <div>{p.insuranceCompany}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{p.subLob || p.policyType?.toUpperCase()}</div>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: '600', color: 'var(--color-warning)' }}>{renewalStr}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--color-danger)' }}>In {daysRemaining} days</div>
+                        </td>
+                        <td style={{ fontWeight: '700', color: 'var(--color-success)' }}>
+                          ₹ {(p.premium || p.finalPremium || 0).toLocaleString('en-IN')}
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            title="Send WhatsApp Renewal Reminder"
+                            onClick={() => handleOpenWhatsapp(p)}
+                            style={{ color: '#25D366' }}
+                          >
+                            <MessageSquare size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
-        {/* 11. Recent Activity Feed */}
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Recent Activity</h3>
-            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/activity')}>View Timeline</button>
+        {/* Quick Launchpad & Portfolio Distribution */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Quick PDF OCR Launchpad */}
+          <div className="card" style={{ backgroundColor: 'var(--color-accent-light)', border: '1px solid var(--color-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <UploadCloud size={24} style={{ color: 'var(--color-accent)' }} />
+              <h3 style={{ fontSize: '16px', fontWeight: '700' }}>AI Policy PDF Intake</h3>
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-main)', marginBottom: '16px', lineHeight: '1.5' }}>
+              Upload any insurer's policy schedule PDF. The system extracts customer info, vehicle details, premium, and dates for your 1-click confirmation.
+            </p>
+            <button 
+              className="btn btn-primary btn-sm" 
+              onClick={() => setIsPdfModalOpen(true)}
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
+              <UploadCloud size={14} /> Launch PDF OCR Extractor
+            </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {MOCK_ACTIVITY.slice(0, 4).map(act => (
-              <div key={act.id} style={{
-                display: 'flex',
-                gap: '12px',
-                paddingBottom: '12px',
-                borderBottom: '1px solid var(--color-border-subtle)',
-                fontSize: '13px'
-              }}>
-                <div style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--color-accent)',
-                  marginTop: '6px'
-                }} />
-                <div>
-                  <div style={{ fontWeight: '600', color: 'var(--color-text-main)' }}>{act.action}</div>
-                  <div style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: '2px' }}>{act.details}</div>
-                  <div style={{ color: 'var(--color-text-light)', fontSize: '11px', marginTop: '4px' }}>
-                    {act.agentName} • {act.timestamp}
+          {/* Insurance Line Breakdown */}
+          <div className="card">
+            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Portfolio by Insurance Line</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                { name: 'Health Insurance', type: 'health', count: filteredPolicies.filter(p => p.policyType === 'health').length, color: '#3b82f6' },
+                { name: 'Motor Insurance', type: 'motor', count: filteredPolicies.filter(p => p.policyType === 'motor').length, color: '#10b981' },
+                { name: 'Term Life Insurance', type: 'term', count: filteredPolicies.filter(p => p.policyType === 'term').length, color: '#8b5cf6' },
+                { name: 'Life & Savings', type: 'life', count: filteredPolicies.filter(p => p.policyType === 'life').length, color: '#f59e0b' },
+                { name: 'Other Insurance', type: 'other', count: filteredPolicies.filter(p => !['health', 'motor', 'term', 'life'].includes(p.policyType)).length, color: '#6b7280' }
+              ].map(item => (
+                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', padding: '6px 0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: item.color }} />
+                    <span>{item.name}</span>
                   </div>
+                  <span style={{ fontWeight: '700' }}>{item.count} Policies</span>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* PDF OCR Modal */}
+      <PolicyPdfUploadModal
+        isOpen={isPdfModalOpen}
+        onClose={() => setIsPdfModalOpen(false)}
+        onSaveSuccess={() => loadDashboardData()}
+      />
+
+      {/* WhatsApp Modal */}
+      <WhatsappPreviewModal
+        isOpen={!!whatsappCustomer}
+        onClose={() => { setWhatsappCustomer(null); setSelectedPolicyForWhatsapp(null); }}
+        customer={whatsappCustomer}
+        policy={selectedPolicyForWhatsapp}
+      />
     </div>
   );
 };

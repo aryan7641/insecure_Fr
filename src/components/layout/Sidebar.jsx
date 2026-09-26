@@ -12,13 +12,12 @@ export const Sidebar = () => {
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { label: 'Customers', path: '/customers', icon: Users },
-    { label: 'Insurance', path: '/insurance', icon: Shield },
-    { label: 'Mutual Funds', path: '/mutual-funds', icon: TrendingUp },
-    { label: 'Follow-ups', path: '/followups', icon: CalendarCheck },
-    { label: 'Documents', path: '/documents', icon: FileText },
+    { label: 'Insurance Policies', path: '/insurance', icon: Shield },
+    { label: 'Follow-ups & Renewals', path: '/followups', icon: CalendarCheck },
+    { label: 'Document Vault', path: '/documents', icon: FileText },
     { label: 'Analytics', path: '/analytics', icon: BarChart3 },
     { label: 'Imports', path: '/imports', icon: UploadCloud },
-    { label: 'Activity', path: '/activity', icon: Activity },
+    { label: 'Activity Logs', path: '/activity', icon: Activity },
     { label: 'Settings', path: '/settings', icon: Settings, adminOnly: true }
   ];
 
@@ -60,7 +59,7 @@ export const Sidebar = () => {
         </div>
         <div>
           <h1 style={{ fontSize: '18px', fontWeight: '700', lineHeight: 1.1 }}>INSecure</h1>
-          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: '500' }}>Financial CRM</span>
+          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: '500' }}>Insurance CRM</span>
         </div>
       </div>
 

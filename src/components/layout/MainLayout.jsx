@@ -3,9 +3,11 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { CustomerFormModal } from '../customers/CustomerFormModal';
+import { PolicyPdfUploadModal } from '../insurance/PolicyPdfUploadModal';
 
 export const MainLayout = () => {
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [isPolicyPdfModalOpen, setIsPolicyPdfModalOpen] = useState(false);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--color-bg)' }}>
@@ -21,7 +23,10 @@ export const MainLayout = () => {
         minWidth: 0
       }}>
         {/* Top Header */}
-        <Header onOpenCustomerModal={() => setIsCustomerModalOpen(true)} />
+        <Header 
+          onOpenCustomerModal={() => setIsCustomerModalOpen(true)}
+          onOpenPolicyPdfModal={() => setIsPolicyPdfModalOpen(true)}
+        />
 
         {/* Dynamic Page Container */}
         <main style={{ padding: '24px', flex: 1 }}>
@@ -33,6 +38,12 @@ export const MainLayout = () => {
       <CustomerFormModal
         isOpen={isCustomerModalOpen}
         onClose={() => setIsCustomerModalOpen(false)}
+      />
+
+      {/* Policy PDF OCR Extraction Modal */}
+      <PolicyPdfUploadModal
+        isOpen={isPolicyPdfModalOpen}
+        onClose={() => setIsPolicyPdfModalOpen(false)}
       />
     </div>
   );
