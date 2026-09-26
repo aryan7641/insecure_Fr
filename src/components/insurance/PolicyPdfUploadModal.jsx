@@ -38,10 +38,11 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
 
 
   // Active Tab in Review Right Panel
-  const [activeTab, setActiveTab] = useState('customer'); // 'customer' | 'policy' | 'coverage' | 'premium' | 'members' | 'motor' | 'nominee'
+  const [activeTab, setActiveTab] = useState('customer');
 
   // Editable Form State
   const [customerData, setCustomerData] = useState({
+    title: '',
     name: '',
     mobile: '',
     email: '',
@@ -51,6 +52,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
     aadhaar: '',
     address: '',
     city: '',
+    district: '',
     state: '',
     pincode: '',
     customerType: 'individual'
@@ -64,12 +66,19 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
     insuranceType: 'health',
     insuranceSubtype: 'family_floater',
     businessType: 'new',
+    policyType: 'Package Policy',
+    issueDate: '',
     startDate: '',
     endDate: '',
     renewalDate: '',
+    tenureYears: '1',
     sumAssured: '',
     basicPremium: '',
     gst: '',
+    gstPercentage: '18',
+    cess: '',
+    discount: '',
+    loading: '',
     finalPremium: '',
     installmentAmount: '',
     premiumFrequency: 'yearly',
@@ -77,26 +86,98 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
   });
 
   const [motorData, setMotorData] = useState({
-    registrationNumber: '',
+    // Vehicle Details
     vehicleType: 'Private Car',
+    vehicleCategory: 'Private Car',
     make: '',
     model: '',
     variant: '',
-    idv: '',
-    ncbPercentage: '0',
+    subModel: '',
     fuelType: 'Petrol',
+    cubicCapacity: '',
+    seatingCapacity: '',
+    numberOfTyres: '',
+    vehicleColor: '',
+    // Registration Details
+    registrationNumber: '',
+    registrationDate: '',
+    registrationState: '',
+    registrationCity: '',
+    rtoCode: '',
+    rtoName: '',
+    zone: '',
+    // Manufacturing Details
+    manufacturingMonth: '',
+    manufacturingYear: '',
+    manufacturingDate: '',
+    // Identification Numbers
     engineNumber: '',
     chassisNumber: '',
-    manufacturingYear: '',
-    registrationDate: '',
+    vinNumber: '',
+    identificationNumber: '',
+    // Valuation & NCB
+    idv: '',
+    vehicleValue: '',
+    currentNcbPercentage: '',
+    previousNcbPercentage: '',
+    ncbPercentage: '0',
+    // Previous Policy
+    previousPolicyAvailable: null,
     previousInsurer: '',
     previousPolicyNumber: '',
-    ownDamagePremium: '',
-    thirdPartyPremium: '',
+    previousPolicyStartDate: '',
+    previousPolicyEndDate: '',
+    previousPolicyType: '',
+    previousNcb: '',
+    previousIdv: '',
+    // Third Party Policy
+    activeTpInsurerName: '',
+    activeTpPolicyNumber: '',
+    activeTpPolicyStartDate: '',
+    activeTpPolicyEndDate: '',
+    tpPremium: '',
+    // Financing
+    financed: null,
+    financierName: '',
+    hypothecation: '',
+    loanProvider: '',
+    // Add-on flags
+    addons: [],
     zeroDepreciation: false,
     engineProtection: false,
     roadsideAssistance: false,
-    consumables: false
+    consumables: false,
+    returnToInvoice: false,
+    ncbProtector: false,
+    tyreProtector: false,
+    keyReplacement: false,
+    personalBelongings: false,
+    personalAccidentCover: false,
+    // Premiums Breakdown
+    ownDamagePremium: '',
+    thirdPartyPremium: '',
+    personalAccidentPremium: '',
+    addonPremium: '',
+    discount: '',
+    loading: '',
+    cess: ''
+  });
+
+  const [brokerData, setBrokerData] = useState({
+    brokerAgency: '',
+    agentName: '',
+    subAgent: '',
+    brokerCode: '',
+    agentCode: ''
+  });
+
+  const [paymentData, setPaymentData] = useState({
+    paymentStatus: 'completed',
+    paymentMethod: 'Online',
+    paymentDate: '',
+    paymentAmount: '',
+    transactionReference: '',
+    receiptNumber: ''
   });
 
   const [healthDetails, setHealthDetails] = useState({
@@ -158,6 +239,29 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
   const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id') || '6ab7424622537587efc9ef30';
 
   /**
+   * Helper badge to clearly distinguish AI Extracted vs Manual vs Calculated vs Needs Review
+   */
+  const renderFieldBadge = (key, customLabel = null) => {
+    const info = fieldStatuses[key];
+    const state = info?.state || 'not_found';
+    const source = info?.source;
+
+    if (source === 'calculated') {
+      return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#e0f2fe', color: '#0369a1', fontWeight: '600' }}>Calculated</span>;
+    }
+    if (state === 'extracted') {
+      return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#dcfce7', color: '#15803d', fontWeight: '600' }}>AI Extracted</span>;
+    }
+    if (state === 'needs_review') {
+      return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#fef3c7', color: '#b45309', fontWeight: '600' }}>Needs Review</span>;
+    }
+    if (customLabel) {
+      return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#64748b', fontWeight: '500' }}>{customLabel}</span>;
+    }
+    return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#f8fafc', color: '#94a3b8', fontWeight: '500' }}>Not Detected</span>;
+  };
+
+  /**
    * Fetches a short-lived presigned URL from backend to display the PDF in the browser.
    * This keeps the S3 bucket private — no direct public S3 URL is ever used in the iframe.
    */
@@ -172,12 +276,10 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
       }
     } catch (err) {
       console.warn('[PolicyPdfUploadModal] Could not fetch presigned PDF URL:', err.message);
-      // Non-fatal: PDF preview just won't show, form data still accessible
     } finally {
       setIsFetchingPdfUrl(false);
     }
   };
-
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -211,11 +313,11 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
       
       const newDocId = data.documentId;
       setDocumentId(newDocId);
-      setBlobUrl(data.blobUrl || null); // stored for reference only
+      setBlobUrl(data.blobUrl || null);
       setClassification(data.classification || null);
       setDuplicateCandidates(data.duplicateCandidates || { customers: [], policies: [] });
 
-      // Fetch presigned URL for secure PDF viewing — never use raw S3 blobUrl in iframe
+      // Fetch presigned URL for secure PDF viewing
       if (newDocId) {
         fetchPresignedPdfUrl(newDocId);
       }
@@ -226,13 +328,15 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
       const extPrem = ext.premium || {};
       const extMot = ext.motor || {};
       const extNom = ext.nominee || {};
+      const extBroker = ext.brokerDetails || {};
+      const extPayment = ext.paymentDetails || {};
       const extHealth = ext.healthDetails || {};
       const extLife = ext.lifeDetails || {};
       const extTravel = ext.travelDetails || {};
       const extProperty = ext.propertyDetails || {};
 
-      const detectedSubtype = data.classification?.effectiveSubtype || selectedSubtype || 'individual_health';
-      const detectedType = data.classification?.effectiveType || selectedType || 'health';
+      const detectedSubtype = data.classification?.effectiveSubtype || selectedSubtype || 'car';
+      const detectedType = data.classification?.effectiveType || selectedType || 'motor';
 
       setSelectedType(detectedType);
       setSelectedSubtype(detectedSubtype);
@@ -240,30 +344,68 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
       // Track field statuses for review indicators
       const statuses = {};
       const recordStatus = (key, fieldObj) => {
-        if (!fieldObj) return;
+        if (!fieldObj) {
+          statuses[key] = { state: 'not_found', confidence: null, source: 'document' };
+          return;
+        }
         statuses[key] = {
-          state: fieldObj.state || (fieldObj.value ? 'extracted' : 'not_found'),
-          confidence: fieldObj.confidence || 0.8
+          state: fieldObj.state || (fieldObj.value !== undefined && fieldObj.value !== null && fieldObj.value !== '' ? 'extracted' : 'not_found'),
+          confidence: fieldObj.confidence || null,
+          source: fieldObj.source || 'document'
         };
       };
 
+      // Customer fields
       recordStatus('customer.name', extCust.name);
       recordStatus('customer.mobile', extCust.mobile);
       recordStatus('customer.email', extCust.email);
+      recordStatus('customer.dob', extCust.dob);
       recordStatus('customer.pan', extCust.pan);
+      recordStatus('customer.aadhaar', extCust.aadhaar);
+      recordStatus('customer.address', extCust.address);
+      recordStatus('customer.city', extCust.city);
+      recordStatus('customer.district', extCust.district);
+      recordStatus('customer.state', extCust.state);
+      recordStatus('customer.pincode', extCust.pincode);
+
+      // Policy fields
       recordStatus('policy.insurer', extPol.insurer);
       recordStatus('policy.policyNumber', extPol.policyNumber);
+      recordStatus('policy.policyType', extPol.policyType);
+      recordStatus('policy.productName', extPol.productName);
       recordStatus('policy.startDate', extPol.startDate);
+      recordStatus('policy.endDate', extPol.endDate);
       recordStatus('policy.renewalDate', extPol.renewalDate);
       recordStatus('policy.sumAssured', extPol.sumAssured);
       recordStatus('premium.finalPremium', extPrem.finalPremium);
-      if (extMot.registrationNumber) recordStatus('motor.registrationNumber', extMot.registrationNumber);
-      if (extMot.idv) recordStatus('motor.idv', extMot.idv);
+      recordStatus('premium.basicPremium', extPrem.basicPremium);
+      recordStatus('premium.gst', extPrem.gst);
+
+      // Motor fields
+      if (extMot) {
+        recordStatus('motor.registrationNumber', extMot.registrationNumber);
+        recordStatus('motor.make', extMot.make);
+        recordStatus('motor.model', extMot.model);
+        recordStatus('motor.variant', extMot.variant);
+        recordStatus('motor.fuelType', extMot.fuelType);
+        recordStatus('motor.cubicCapacity', extMot.cubicCapacity);
+        recordStatus('motor.seatingCapacity', extMot.seatingCapacity);
+        recordStatus('motor.engineNumber', extMot.engineNumber);
+        recordStatus('motor.chassisNumber', extMot.chassisNumber);
+        recordStatus('motor.idv', extMot.idv);
+        recordStatus('motor.ncb', extMot.ncb);
+        recordStatus('motor.ownDamagePremium', extMot.ownDamagePremium);
+        recordStatus('motor.thirdPartyPremium', extMot.thirdPartyPremium);
+        recordStatus('motor.previousInsurer', extMot.previousInsurer);
+        recordStatus('motor.previousPolicyNumber', extMot.previousPolicyNumber);
+        recordStatus('motor.financierName', extMot.financierName);
+      }
 
       setFieldStatuses(statuses);
 
-      // Populate draft form state
+      // Populate draft customer form state
       setCustomerData({
+        title: extCust.title?.value || '',
         name: extCust.name?.value || '',
         mobile: extCust.mobile?.value || '',
         email: extCust.email?.value || '',
@@ -273,11 +415,13 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
         aadhaar: extCust.aadhaar?.value || '',
         address: extCust.address?.value || '',
         city: extCust.city?.value || '',
+        district: extCust.district?.value || '',
         state: extCust.state?.value || '',
         pincode: extCust.pincode?.value || '',
-        customerType: 'individual'
+        customerType: extCust.customerType?.value || 'individual'
       });
 
+      // Populate draft policy form state
       setPolicyData({
         insurer: extPol.insurer?.value || '',
         productName: extPol.productName?.value || '',
@@ -286,40 +430,115 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
         insuranceType: detectedType,
         insuranceSubtype: detectedSubtype,
         businessType: extPol.businessType?.value || 'new',
+        policyType: extPol.policyType?.value || 'Package Policy',
+        issueDate: extPol.issueDate?.value ? extPol.issueDate.value.slice(0, 10) : '',
         startDate: extPol.startDate?.value ? extPol.startDate.value.slice(0, 10) : '',
         endDate: extPol.endDate?.value ? extPol.endDate.value.slice(0, 10) : '',
         renewalDate: extPol.renewalDate?.value ? extPol.renewalDate.value.slice(0, 10) : '',
+        tenureYears: extPol.tenureYears?.value ? String(extPol.tenureYears.value) : '1',
         sumAssured: extPol.sumAssured?.value || '',
         basicPremium: extPrem.basicPremium?.value || '',
         gst: extPrem.gst?.value || '',
+        gstPercentage: extPrem.gstPercentage?.value || '18',
+        cess: extPrem.cess?.value || '',
+        discount: extPrem.discount?.value || '',
+        loading: extPrem.loading?.value || '',
         finalPremium: extPrem.finalPremium?.value || '',
         installmentAmount: extPrem.installmentAmount?.value || '',
         premiumFrequency: 'yearly',
         notes: ''
       });
 
+      // Populate draft motor form state
       if (extMot) {
         setMotorData({
-          registrationNumber: extMot.registrationNumber?.value || '',
           vehicleType: extMot.vehicleType?.value || 'Private Car',
+          vehicleCategory: extMot.vehicleCategory?.value || 'Private Car',
           make: extMot.make?.value || '',
           model: extMot.model?.value || '',
           variant: extMot.variant?.value || '',
-          idv: extMot.idv?.value || '',
-          ncbPercentage: extMot.ncbPercentage?.value || '0',
+          subModel: extMot.subModel?.value || '',
           fuelType: extMot.fuelType?.value || 'Petrol',
+          cubicCapacity: extMot.cubicCapacity?.value || '',
+          seatingCapacity: extMot.seatingCapacity?.value || '',
+          numberOfTyres: extMot.numberOfTyres?.value || '',
+          vehicleColor: extMot.vehicleColor?.value || '',
+          registrationNumber: extMot.registrationNumber?.value || '',
+          registrationDate: extMot.registrationDate?.value ? extMot.registrationDate.value.slice(0, 10) : '',
+          registrationState: extMot.registrationState?.value || '',
+          registrationCity: extMot.registrationCity?.value || '',
+          rtoCode: extMot.rtoCode?.value || '',
+          rtoName: extMot.rtoName?.value || '',
+          zone: extMot.zone?.value || '',
+          manufacturingMonth: extMot.manufacturingMonth?.value || '',
+          manufacturingYear: extMot.manufacturingYear?.value || '',
+          manufacturingDate: extMot.manufacturingDate?.value ? extMot.manufacturingDate.value.slice(0, 10) : '',
           engineNumber: extMot.engineNumber?.value || '',
           chassisNumber: extMot.chassisNumber?.value || '',
-          manufacturingYear: extMot.manufacturingYear?.value || '',
-          registrationDate: extMot.registrationDate?.value ? extMot.registrationDate.value.slice(0, 10) : '',
+          vinNumber: extMot.vinNumber?.value || '',
+          identificationNumber: extMot.identificationNumber?.value || '',
+          idv: extMot.idv?.value || '',
+          vehicleValue: extMot.vehicleValue?.value || '',
+          currentNcbPercentage: extMot.currentNcbPercentage?.value !== undefined && extMot.currentNcbPercentage?.value !== null ? String(extMot.currentNcbPercentage.value) : '',
+          previousNcbPercentage: extMot.previousNcbPercentage?.value !== undefined && extMot.previousNcbPercentage?.value !== null ? String(extMot.previousNcbPercentage.value) : '',
+          ncbPercentage: extMot.ncb?.value !== undefined && extMot.ncb?.value !== null ? String(extMot.ncb.value) : '0',
+          previousPolicyAvailable: extMot.previousPolicyAvailable?.value !== undefined ? extMot.previousPolicyAvailable.value : null,
           previousInsurer: extMot.previousInsurer?.value || '',
           previousPolicyNumber: extMot.previousPolicyNumber?.value || '',
-          ownDamagePremium: extMot.ownDamagePremium?.value || '',
-          thirdPartyPremium: extMot.thirdPartyPremium?.value || '',
+          previousPolicyStartDate: extMot.previousPolicyStartDate?.value ? extMot.previousPolicyStartDate.value.slice(0, 10) : '',
+          previousPolicyEndDate: extMot.previousPolicyEndDate?.value ? extMot.previousPolicyEndDate.value.slice(0, 10) : '',
+          previousPolicyType: extMot.previousPolicyType?.value || '',
+          previousNcb: extMot.previousNcb?.value || '',
+          previousIdv: extMot.previousIdv?.value || '',
+          activeTpInsurerName: extMot.activeTpInsurerName?.value || '',
+          activeTpPolicyNumber: extMot.activeTpPolicyNumber?.value || '',
+          activeTpPolicyStartDate: extMot.activeTpPolicyStartDate?.value ? extMot.activeTpPolicyStartDate.value.slice(0, 10) : '',
+          activeTpPolicyEndDate: extMot.activeTpPolicyEndDate?.value ? extMot.activeTpPolicyEndDate.value.slice(0, 10) : '',
+          tpPremium: extMot.tpPremium?.value || '',
+          financed: extMot.financed?.value !== undefined ? extMot.financed.value : null,
+          financierName: extMot.financierName?.value || '',
+          hypothecation: extMot.hypothecation?.value || '',
+          loanProvider: extMot.loanProvider?.value || '',
+          addons: extMot.addons || [],
           zeroDepreciation: !!extMot.zeroDepreciation?.value,
           engineProtection: !!extMot.engineProtection?.value,
           roadsideAssistance: !!extMot.roadsideAssistance?.value,
-          consumables: !!extMot.consumables?.value
+          consumables: !!extMot.consumables?.value,
+          returnToInvoice: !!extMot.returnToInvoice?.value,
+          ncbProtector: !!extMot.ncbProtector?.value,
+          tyreProtector: !!extMot.tyreProtector?.value,
+          keyReplacement: !!extMot.keyReplacement?.value,
+          personalBelongings: !!extMot.personalBelongings?.value,
+          personalAccidentCover: !!extMot.personalAccidentCover?.value,
+          ownDamagePremium: extMot.ownDamagePremium?.value || '',
+          thirdPartyPremium: extMot.thirdPartyPremium?.value || '',
+          personalAccidentPremium: extMot.personalAccidentPremium?.value || '',
+          addonPremium: extMot.addonPremium?.value || '',
+          discount: extPrem.discount?.value || '',
+          loading: extPrem.loading?.value || '',
+          cess: extPrem.cess?.value || ''
+        });
+      }
+
+      // Populate draft broker & payment state
+      if (extBroker) {
+        setBrokerData({
+          brokerAgency: extBroker.brokerAgency?.value || '',
+          agentName: extBroker.agentName?.value || '',
+          subAgent: extBroker.subAgent?.value || '',
+          brokerCode: extBroker.brokerCode?.value || '',
+          agentCode: extBroker.agentCode?.value || ''
+        });
+      }
+
+      if (extPayment) {
+        setPaymentData({
+          paymentStatus: extPayment.paymentStatus?.value || 'completed',
+          paymentMethod: extPayment.paymentMethod?.value || 'Online',
+          paymentDate: extPayment.paymentDate?.value ? extPayment.paymentDate.value.slice(0, 10) : '',
+          paymentAmount: extPayment.paymentAmount?.value || '',
+          transactionReference: extPayment.transactionReference?.value || '',
+          receiptNumber: extPayment.receiptNumber?.value || ''
         });
       }
 
@@ -449,29 +668,24 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
           gst: policyData.gst ? Number(policyData.gst) : undefined,
           finalPremium: policyData.finalPremium ? Number(policyData.finalPremium) : Number(policyData.premium)
         },
-        premiumData: {
-          basicPremium: policyData.basicPremium,
-          gst: policyData.gst,
-          finalPremium: policyData.finalPremium || policyData.premium,
-          premiumFrequency: policyData.premiumFrequency
-        },
         motorData: selectedType === 'motor' ? motorData : undefined,
+        brokerDetails: brokerData,
+        paymentDetails: paymentData,
         healthDetails: selectedType === 'health' ? healthDetails : undefined,
         lifeDetails: selectedType === 'life' ? lifeDetails : undefined,
         travelDetails: selectedSubtype === 'travel' ? travelDetails : undefined,
         propertyDetails: selectedSubtype === 'home_property' ? propertyDetails : undefined,
-        insuredMembers: insuredMembers,
-        nomineeData: nomineeData.name ? nomineeData : undefined
+        nomineeData,
+        insuredMembers: currentSubtypeSchema.entities.hasMembers ? insuredMembers : []
       };
 
       await apiClient.post(`/agencies/${agencyId}/ocr/${documentId}/confirm-policy`, payload);
-
-      addToast(`Policy #${policyData.policyNumber} confirmed & created successfully!`, 'success');
+      addToast('Policy successfully created and verified!', 'success');
       if (onSaveSuccess) onSaveSuccess();
       handleClose();
     } catch (err) {
-      console.error('Confirmation error:', err);
-      addToast(err.message || 'Failed to confirm policy creation', 'danger');
+      console.error('Confirm policy error:', err);
+      addToast(err.response?.data?.message || err.message || 'Failed to save policy', 'danger');
     } finally {
       setIsConfirming(false);
     }
@@ -838,21 +1052,29 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
               
               {/* Category Tabs */}
               <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', overflowX: 'auto', gap: '2px' }}>
-                {[
+                {(selectedType === 'motor' ? [
+                  { id: 'customer', label: '1. Customer' },
+                  { id: 'vehicle', label: '2. Vehicle' },
+                  { id: 'policy', label: '3. Policy' },
+                  { id: 'coverage', label: '4. Coverage & Add-ons' },
+                  { id: 'premium', label: '5. Premium' },
+                  { id: 'nominee', label: '6. Nominee' },
+                  { id: 'crm', label: '7. Additional / CRM' }
+                ] : [
                   { id: 'customer', label: 'Customer Info' },
                   { id: 'policy', label: 'Policy Details' },
                   { id: 'coverage', label: 'Subtype Coverage' },
                   { id: 'premium', label: 'Premium & Tax' },
-                  ...(currentSubtypeSchema.entities.hasMembers ? [{ id: 'members', label: `Insured Members (${insuredMembers.length})` }] : []),
-                  ...(currentSubtypeSchema.entities.hasVehicle ? [{ id: 'motor', label: 'Vehicle Details' }] : []),
-                  { id: 'nominee', label: 'Nominee' }
-                ].map(tab => (
+                  ...(currentSubtypeSchema.entities.hasMembers ? [{ id: 'members', label: `Insured Lives (${insuredMembers.length})` }] : []),
+                  { id: 'nominee', label: 'Nominee' },
+                  { id: 'crm', label: 'Additional / CRM' }
+                ]).map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     style={{
                       padding: '8px 12px',
-                      fontSize: '12.5px',
+                      fontSize: '12px',
                       fontWeight: activeTab === tab.id ? '700' : '500',
                       color: activeTab === tab.id ? 'var(--color-accent)' : 'var(--color-text-muted)',
                       borderBottom: activeTab === tab.id ? '2px solid var(--color-accent)' : '2px solid transparent',
@@ -866,117 +1088,229 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                 ))}
               </div>
 
-              {/* Tab Form Content */}
+                {/* Tab Form Content */}
               <div style={{ flex: 1, padding: '16px', overflowY: 'auto' }}>
                 
                 {/* 1. Customer Information */}
                 {activeTab === 'customer' && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div style={{ gridColumn: 'span 2' }}>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Customer / Proposer Full Name *
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Customer / Proposer Full Name *
+                        </label>
+                        {renderFieldBadge('customer.name')}
+                      </div>
                       <input
                         type="text"
                         className="input"
                         style={{ width: '100%', fontSize: '13px' }}
-                        value={customerData.name}
+                        value={customerData.name || ''}
                         onChange={(e) => setCustomerData({ ...customerData, name: e.target.value })}
-                        placeholder="e.g. Kamal Sharma"
+                        placeholder="e.g. Rahul Sharma / ABC Logistics Pvt Ltd"
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Mobile Number *
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Customer Type
+                        </label>
+                        {renderFieldBadge('customer.customerType')}
+                      </div>
+                      <select
+                        className="select"
+                        style={{ width: '100%', fontSize: '13px' }}
+                        value={customerData.customerType || 'individual'}
+                        onChange={(e) => setCustomerData({ ...customerData, customerType: e.target.value })}
+                      >
+                        <option value="individual">Individual</option>
+                        <option value="corporate">Corporate / Commercial</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Title / Salutation
+                        </label>
+                        {renderFieldBadge('customer.title')}
+                      </div>
+                      <select
+                        className="select"
+                        style={{ width: '100%', fontSize: '13px' }}
+                        value={customerData.title || 'Mr.'}
+                        onChange={(e) => setCustomerData({ ...customerData, title: e.target.value })}
+                      >
+                        <option value="Mr.">Mr.</option>
+                        <option value="Mrs.">Mrs.</option>
+                        <option value="Ms.">Ms.</option>
+                        <option value="Dr.">Dr.</option>
+                        <option value="M/s">M/s (Company)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Mobile Number *
+                        </label>
+                        {renderFieldBadge('customer.mobile')}
+                      </div>
                       <input
                         type="text"
                         className="input"
                         style={{ width: '100%', fontSize: '13px' }}
-                        value={customerData.mobile}
+                        value={customerData.mobile || ''}
                         onChange={(e) => setCustomerData({ ...customerData, mobile: e.target.value })}
                         placeholder="10-digit mobile"
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Email Address
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Email Address
+                        </label>
+                        {renderFieldBadge('customer.email')}
+                      </div>
                       <input
                         type="email"
                         className="input"
                         style={{ width: '100%', fontSize: '13px' }}
-                        value={customerData.email}
+                        value={customerData.email || ''}
                         onChange={(e) => setCustomerData({ ...customerData, email: e.target.value })}
+                        placeholder="name@example.com"
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        PAN Card Number
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          PAN Card Number
+                        </label>
+                        {renderFieldBadge('customer.pan')}
+                      </div>
                       <input
                         type="text"
                         className="input"
                         style={{ width: '100%', fontSize: '13px' }}
-                        value={customerData.pan}
+                        value={customerData.pan || ''}
                         onChange={(e) => setCustomerData({ ...customerData, pan: e.target.value.toUpperCase() })}
                         placeholder="ABCDE1234F"
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Date of Birth
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Date of Birth
+                        </label>
+                        {renderFieldBadge('customer.dob')}
+                      </div>
                       <input
                         type="date"
                         className="input"
                         style={{ width: '100%', fontSize: '13px' }}
-                        value={customerData.dob}
+                        value={customerData.dob || ''}
                         onChange={(e) => setCustomerData({ ...customerData, dob: e.target.value })}
                       />
                     </div>
 
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Gender
+                        </label>
+                        {renderFieldBadge('customer.gender')}
+                      </div>
+                      <select
+                        className="select"
+                        style={{ width: '100%', fontSize: '13px' }}
+                        value={customerData.gender || 'male'}
+                        onChange={(e) => setCustomerData({ ...customerData, gender: e.target.value })}
+                      >
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Aadhaar Number
+                        </label>
+                        {renderFieldBadge('customer.aadhaar')}
+                      </div>
+                      <input
+                        type="text"
+                        className="input"
+                        style={{ width: '100%', fontSize: '13px' }}
+                        value={customerData.aadhaar || ''}
+                        onChange={(e) => setCustomerData({ ...customerData, aadhaar: e.target.value })}
+                        placeholder="12-digit Aadhaar"
+                      />
+                    </div>
+
                     <div style={{ gridColumn: 'span 2' }}>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Residential Address
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Residential / Postal Address
+                        </label>
+                        {renderFieldBadge('customer.address')}
+                      </div>
                       <input
                         type="text"
                         className="input"
                         style={{ width: '100%', fontSize: '13px' }}
-                        value={customerData.address}
+                        value={customerData.address || ''}
                         onChange={(e) => setCustomerData({ ...customerData, address: e.target.value })}
+                        placeholder="Flat / House No, Street, Landmark"
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        City
-                      </label>
-                      <input
-                        type="text"
-                        className="input"
-                        style={{ width: '100%', fontSize: '13px' }}
-                        value={customerData.city}
-                        onChange={(e) => setCustomerData({ ...customerData, city: e.target.value })}
-                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          City / District
+                        </label>
+                        {renderFieldBadge('customer.city')}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="text"
+                          className="input"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          placeholder="City"
+                          value={customerData.city || ''}
+                          onChange={(e) => setCustomerData({ ...customerData, city: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          className="input"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          placeholder="District"
+                          value={customerData.district || ''}
+                          onChange={(e) => setCustomerData({ ...customerData, district: e.target.value })}
+                        />
+                      </div>
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        State & PIN
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          State & PIN
+                        </label>
+                        {renderFieldBadge('customer.state')}
+                      </div>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <input
                           type="text"
                           className="input"
                           style={{ flex: 1, fontSize: '13px' }}
                           placeholder="State"
-                          value={customerData.state}
+                          value={customerData.state || ''}
                           onChange={(e) => setCustomerData({ ...customerData, state: e.target.value })}
                         />
                         <input
@@ -984,7 +1318,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                           className="input"
                           style={{ width: '90px', fontSize: '13px' }}
                           placeholder="Pincode"
-                          value={customerData.pincode}
+                          value={customerData.pincode || ''}
                           onChange={(e) => setCustomerData({ ...customerData, pincode: e.target.value })}
                         />
                       </div>
@@ -992,107 +1326,784 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                   </div>
                 )}
 
-                {/* 2. Policy Details */}
-                {activeTab === 'policy' && (
+                {/* 2. Vehicle Details (For Motor) */}
+                {activeTab === 'vehicle' && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ gridColumn: 'span 2' }}>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Insurance Company / Insurer *
-                      </label>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Vehicle Registration No. *
+                        </label>
+                        {renderFieldBadge('motor.registrationNumber')}
+                      </div>
+                      <input
+                        type="text"
+                        className="input"
+                        style={{ width: '100%', fontSize: '13px', fontWeight: '700', textTransform: 'uppercase' }}
+                        value={motorData.registrationNumber || ''}
+                        onChange={(e) => setMotorData({ ...motorData, registrationNumber: e.target.value.toUpperCase() })}
+                        placeholder="MH02EK4921"
+                      />
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Vehicle Category / Type
+                        </label>
+                        {renderFieldBadge('motor.vehicleCategory')}
+                      </div>
                       <input
                         type="text"
                         className="input"
                         style={{ width: '100%', fontSize: '13px' }}
-                        value={policyData.insurer}
-                        onChange={(e) => setPolicyData({ ...policyData, insurer: e.target.value })}
+                        value={motorData.vehicleCategory || motorData.vehicleType || ''}
+                        onChange={(e) => setMotorData({ ...motorData, vehicleCategory: e.target.value, vehicleType: e.target.value })}
+                        placeholder="Private Car / 4 Wheeler"
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Policy Number *
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Make & Model
+                        </label>
+                        {renderFieldBadge('motor.make')}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Make (e.g. Hyundai)"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={motorData.make || ''}
+                          onChange={(e) => setMotorData({ ...motorData, make: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Model (e.g. Creta)"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={motorData.model || ''}
+                          onChange={(e) => setMotorData({ ...motorData, model: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Variant / Sub-Model
+                        </label>
+                        {renderFieldBadge('motor.variant')}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Variant (e.g. SX (O))"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={motorData.variant || ''}
+                          onChange={(e) => setMotorData({ ...motorData, variant: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Sub-model"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={motorData.subModel || ''}
+                          onChange={(e) => setMotorData({ ...motorData, subModel: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Fuel Type & Engine CC
+                        </label>
+                        {renderFieldBadge('motor.fuelType')}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <select
+                          className="select"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={motorData.fuelType || 'petrol'}
+                          onChange={(e) => setMotorData({ ...motorData, fuelType: e.target.value })}
+                        >
+                          <option value="petrol">Petrol</option>
+                          <option value="diesel">Diesel</option>
+                          <option value="cng">CNG</option>
+                          <option value="electric">Electric</option>
+                          <option value="hybrid">Hybrid</option>
+                          <option value="lpg">LPG</option>
+                        </select>
+                        <input
+                          type="number"
+                          className="input"
+                          placeholder="CC (e.g. 1497)"
+                          style={{ width: '100px', fontSize: '13px' }}
+                          value={motorData.cubicCapacity || ''}
+                          onChange={(e) => setMotorData({ ...motorData, cubicCapacity: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Seats, Tyres & Color
+                        </label>
+                        {renderFieldBadge('motor.seatingCapacity')}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="number"
+                          className="input"
+                          placeholder="Seats (5)"
+                          style={{ width: '70px', fontSize: '13px' }}
+                          value={motorData.seatingCapacity || ''}
+                          onChange={(e) => setMotorData({ ...motorData, seatingCapacity: e.target.value })}
+                        />
+                        <input
+                          type="number"
+                          className="input"
+                          placeholder="Tyres (4)"
+                          style={{ width: '70px', fontSize: '13px' }}
+                          value={motorData.numberOfTyres || ''}
+                          onChange={(e) => setMotorData({ ...motorData, numberOfTyres: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Color (e.g. White)"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={motorData.vehicleColor || ''}
+                          onChange={(e) => setMotorData({ ...motorData, vehicleColor: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Registration Date & State
+                        </label>
+                        {renderFieldBadge('motor.registrationDate')}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="date"
+                          className="input"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={motorData.registrationDate || ''}
+                          onChange={(e) => setMotorData({ ...motorData, registrationDate: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Reg State"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={motorData.registrationState || ''}
+                          onChange={(e) => setMotorData({ ...motorData, registrationState: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          RTO Code, Name & Zone
+                        </label>
+                        {renderFieldBadge('motor.rtoCode')}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="RTO Code (e.g. MH02)"
+                          style={{ width: '80px', fontSize: '13px' }}
+                          value={motorData.rtoCode || ''}
+                          onChange={(e) => setMotorData({ ...motorData, rtoCode: e.target.value.toUpperCase() })}
+                        />
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="RTO Name"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={motorData.rtoName || ''}
+                          onChange={(e) => setMotorData({ ...motorData, rtoName: e.target.value })}
+                        />
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Zone (A/B)"
+                          style={{ width: '70px', fontSize: '13px' }}
+                          value={motorData.zone || ''}
+                          onChange={(e) => setMotorData({ ...motorData, zone: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Manufacturing Month & Year
+                        </label>
+                        {renderFieldBadge('motor.manufacturingYear')}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Month (e.g. 05 or May)"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={motorData.manufacturingMonth || ''}
+                          onChange={(e) => setMotorData({ ...motorData, manufacturingMonth: e.target.value })}
+                        />
+                        <input
+                          type="number"
+                          className="input"
+                          placeholder="Year (e.g. 2023)"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={motorData.manufacturingYear || ''}
+                          onChange={(e) => setMotorData({ ...motorData, manufacturingYear: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Chassis Number (VIN)
+                        </label>
+                        {renderFieldBadge('motor.chassisNumber')}
+                      </div>
                       <input
                         type="text"
                         className="input"
-                        style={{ width: '100%', fontSize: '13px', fontWeight: '700', color: 'var(--color-accent)' }}
-                        value={policyData.policyNumber}
-                        onChange={(e) => setPolicyData({ ...policyData, policyNumber: e.target.value })}
+                        style={{ width: '100%', fontSize: '13px', textTransform: 'uppercase' }}
+                        value={motorData.chassisNumber || ''}
+                        onChange={(e) => setMotorData({ ...motorData, chassisNumber: e.target.value.toUpperCase() })}
+                        placeholder="17-character VIN/Chassis"
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Plan / Product Name
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Engine Number
+                        </label>
+                        {renderFieldBadge('motor.engineNumber')}
+                      </div>
                       <input
                         type="text"
                         className="input"
-                        style={{ width: '100%', fontSize: '13px' }}
-                        value={policyData.productName}
-                        onChange={(e) => setPolicyData({ ...policyData, productName: e.target.value })}
+                        style={{ width: '100%', fontSize: '13px', textTransform: 'uppercase' }}
+                        value={motorData.engineNumber || ''}
+                        onChange={(e) => setMotorData({ ...motorData, engineNumber: e.target.value.toUpperCase() })}
+                        placeholder="Engine identification number"
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Policy Start Date
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          VIN / Other Identification
+                        </label>
+                        {renderFieldBadge('motor.vinNumber')}
+                      </div>
                       <input
-                        type="date"
+                        type="text"
                         className="input"
-                        style={{ width: '100%', fontSize: '13px' }}
-                        value={policyData.startDate}
-                        onChange={(e) => setPolicyData({ ...policyData, startDate: e.target.value })}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Policy End Date
-                      </label>
-                      <input
-                        type="date"
-                        className="input"
-                        style={{ width: '100%', fontSize: '13px' }}
-                        value={policyData.endDate}
-                        onChange={(e) => setPolicyData({ ...policyData, endDate: e.target.value })}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Next Renewal Due Date *
-                      </label>
-                      <input
-                        type="date"
-                        className="input"
-                        style={{ width: '100%', fontSize: '13px' }}
-                        value={policyData.renewalDate}
-                        onChange={(e) => setPolicyData({ ...policyData, renewalDate: e.target.value })}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Sum Insured / Sum Assured (INR)
-                      </label>
-                      <input
-                        type="number"
-                        className="input"
-                        style={{ width: '100%', fontSize: '13px', fontWeight: '600' }}
-                        value={policyData.sumAssured}
-                        onChange={(e) => setPolicyData({ ...policyData, sumAssured: e.target.value })}
-                        placeholder="500000"
+                        style={{ width: '100%', fontSize: '13px', textTransform: 'uppercase' }}
+                        value={motorData.vinNumber || motorData.identificationNumber || ''}
+                        onChange={(e) => setMotorData({ ...motorData, vinNumber: e.target.value.toUpperCase(), identificationNumber: e.target.value.toUpperCase() })}
                       />
                     </div>
                   </div>
                 )}
 
-                {/* 3. Subtype-Specific Coverage Details */}
+                {/* 3. Policy Details */}
+                {activeTab === 'policy' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Insurance Company / Insurer *
+                        </label>
+                        {renderFieldBadge('policy.insurer')}
+                      </div>
+                      <input
+                        type="text"
+                        className="input"
+                        style={{ width: '100%', fontSize: '13px' }}
+                        value={policyData.insurer || ''}
+                        onChange={(e) => setPolicyData({ ...policyData, insurer: e.target.value })}
+                        placeholder="e.g. HDFC ERGO General Insurance Co."
+                      />
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Policy Number *
+                        </label>
+                        {renderFieldBadge('policy.policyNumber')}
+                      </div>
+                      <input
+                        type="text"
+                        className="input"
+                        style={{ width: '100%', fontSize: '13px', fontWeight: '700', color: 'var(--color-accent)' }}
+                        value={policyData.policyNumber || ''}
+                        onChange={(e) => setPolicyData({ ...policyData, policyNumber: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Plan / Product Name
+                        </label>
+                        {renderFieldBadge('policy.productName')}
+                      </div>
+                      <input
+                        type="text"
+                        className="input"
+                        style={{ width: '100%', fontSize: '13px' }}
+                        value={policyData.productName || ''}
+                        onChange={(e) => setPolicyData({ ...policyData, productName: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Policy Type & Class
+                        </label>
+                        {renderFieldBadge('policy.policyType')}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <select
+                          className="select"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={policyData.policyType || 'comprehensive'}
+                          onChange={(e) => setPolicyData({ ...policyData, policyType: e.target.value })}
+                        >
+                          <option value="comprehensive">Comprehensive / Package</option>
+                          <option value="third_party">Third Party Only</option>
+                          <option value="own_damage">Standalone Own Damage</option>
+                          <option value="bundled">Bundled</option>
+                          <option value="term">Term Life</option>
+                          <option value="floater">Family Floater</option>
+                          <option value="individual">Individual</option>
+                        </select>
+                        <select
+                          className="select"
+                          style={{ width: '120px', fontSize: '13px' }}
+                          value={policyData.businessType || 'renewal'}
+                          onChange={(e) => setPolicyData({ ...policyData, businessType: e.target.value })}
+                        >
+                          <option value="renewal">Rollover / Renewal</option>
+                          <option value="new">New Business</option>
+                          <option value="break_in">Break-in</option>
+                          <option value="endorsement">Endorsement</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Policy Issue Date
+                        </label>
+                        {renderFieldBadge('policy.issueDate')}
+                      </div>
+                      <input
+                        type="date"
+                        className="input"
+                        style={{ width: '100%', fontSize: '13px' }}
+                        value={policyData.issueDate || ''}
+                        onChange={(e) => setPolicyData({ ...policyData, issueDate: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Policy Start Date
+                        </label>
+                        {renderFieldBadge('policy.startDate')}
+                      </div>
+                      <input
+                        type="date"
+                        className="input"
+                        style={{ width: '100%', fontSize: '13px' }}
+                        value={policyData.startDate || ''}
+                        onChange={(e) => setPolicyData({ ...policyData, startDate: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Policy End Date
+                        </label>
+                        {renderFieldBadge('policy.endDate')}
+                      </div>
+                      <input
+                        type="date"
+                        className="input"
+                        style={{ width: '100%', fontSize: '13px' }}
+                        value={policyData.endDate || ''}
+                        onChange={(e) => setPolicyData({ ...policyData, endDate: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Next Renewal Due Date *
+                        </label>
+                        {renderFieldBadge('policy.renewalDate')}
+                      </div>
+                      <input
+                        type="date"
+                        className="input"
+                        style={{ width: '100%', fontSize: '13px' }}
+                        value={policyData.renewalDate || ''}
+                        onChange={(e) => setPolicyData({ ...policyData, renewalDate: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Sum Insured / Sum Assured (INR)
+                        </label>
+                        {renderFieldBadge('policy.sumAssured')}
+                      </div>
+                      <input
+                        type="number"
+                        className="input"
+                        style={{ width: '100%', fontSize: '13px', fontWeight: '600' }}
+                        value={policyData.sumAssured || ''}
+                        onChange={(e) => setPolicyData({ ...policyData, sumAssured: e.target.value })}
+                        placeholder="500000"
+                      />
+                    </div>
+
+                    {/* Section E: Previous Policy (For Motor) */}
+                    {selectedType === 'motor' && (
+                      <div style={{ gridColumn: 'span 2', marginTop: '8px', padding: '10px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-main)', marginBottom: '8px' }}>
+                          Previous Policy Information (Prior Period)
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)', display: 'block', marginBottom: '2px' }}>
+                              Previous Insurer
+                            </label>
+                            <input
+                              type="text"
+                              className="input"
+                              style={{ width: '100%', fontSize: '12px' }}
+                              value={policyData.previousInsurer || ''}
+                              onChange={(e) => setPolicyData({ ...policyData, previousInsurer: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)', display: 'block', marginBottom: '2px' }}>
+                              Previous Policy No.
+                            </label>
+                            <input
+                              type="text"
+                              className="input"
+                              style={{ width: '100%', fontSize: '12px' }}
+                              value={policyData.previousPolicyNumber || ''}
+                              onChange={(e) => setPolicyData({ ...policyData, previousPolicyNumber: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)', display: 'block', marginBottom: '2px' }}>
+                              Previous Policy Type
+                            </label>
+                            <input
+                              type="text"
+                              className="input"
+                              style={{ width: '100%', fontSize: '12px' }}
+                              value={motorData.previousPolicyType || ''}
+                              onChange={(e) => setMotorData({ ...motorData, previousPolicyType: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)', display: 'block', marginBottom: '2px' }}>
+                              Previous Start Date
+                            </label>
+                            <input
+                              type="date"
+                              className="input"
+                              style={{ width: '100%', fontSize: '12px' }}
+                              value={motorData.previousPolicyStartDate || ''}
+                              onChange={(e) => setMotorData({ ...motorData, previousPolicyStartDate: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)', display: 'block', marginBottom: '2px' }}>
+                              Previous Expiry Date
+                            </label>
+                            <input
+                              type="date"
+                              className="input"
+                              style={{ width: '100%', fontSize: '12px' }}
+                              value={motorData.previousPolicyEndDate || ''}
+                              onChange={(e) => setMotorData({ ...motorData, previousPolicyEndDate: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)', display: 'block', marginBottom: '2px' }}>
+                              Previous NCB (%)
+                            </label>
+                            <input
+                              type="number"
+                              className="input"
+                              style={{ width: '100%', fontSize: '12px' }}
+                              value={motorData.previousNcbPercentage || motorData.previousNcb || ''}
+                              onChange={(e) => setMotorData({ ...motorData, previousNcbPercentage: e.target.value, previousNcb: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 4. Coverage & Add-ons */}
                 {activeTab === 'coverage' && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    {selectedType === 'health' && (
+                    {selectedType === 'motor' ? (
+                      <>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                              Insured Declared Value - IDV (INR) *
+                            </label>
+                            {renderFieldBadge('motor.idv')}
+                          </div>
+                          <input
+                            type="number"
+                            className="input"
+                            style={{ width: '100%', fontSize: '13px', fontWeight: '700', color: 'var(--color-accent)' }}
+                            value={motorData.idv || ''}
+                            onChange={(e) => setMotorData({ ...motorData, idv: e.target.value })}
+                            placeholder="e.g. 850000"
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                              Vehicle Value / Ex-Showroom (INR)
+                            </label>
+                            {renderFieldBadge('motor.vehicleValue')}
+                          </div>
+                          <input
+                            type="number"
+                            className="input"
+                            style={{ width: '100%', fontSize: '13px' }}
+                            value={motorData.vehicleValue || ''}
+                            onChange={(e) => setMotorData({ ...motorData, vehicleValue: e.target.value })}
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                              Current NCB Discount (%)
+                            </label>
+                            {renderFieldBadge('motor.ncbPercentage')}
+                          </div>
+                          <input
+                            type="number"
+                            className="input"
+                            style={{ width: '100%', fontSize: '13px', fontWeight: '600' }}
+                            value={motorData.ncbPercentage || motorData.currentNcbPercentage || ''}
+                            onChange={(e) => setMotorData({ ...motorData, ncbPercentage: e.target.value, currentNcbPercentage: e.target.value })}
+                            placeholder="e.g. 20, 25, 35, 45, 50"
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                              Previous NCB (%)
+                            </label>
+                            {renderFieldBadge('motor.previousNcbPercentage')}
+                          </div>
+                          <input
+                            type="number"
+                            className="input"
+                            style={{ width: '100%', fontSize: '13px' }}
+                            value={motorData.previousNcbPercentage || motorData.previousNcb || ''}
+                            onChange={(e) => setMotorData({ ...motorData, previousNcbPercentage: e.target.value, previousNcb: e.target.value })}
+                          />
+                        </div>
+
+                        {/* Standalone OD / Active Third Party Details */}
+                        <div style={{ gridColumn: 'span 2', padding: '10px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                          <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-main)', marginBottom: '8px' }}>
+                            Active Third Party (TP) Policy Schedule (For Standalone OD)
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px' }}>
+                            <div>
+                              <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)', display: 'block', marginBottom: '2px' }}>
+                                TP Insurer
+                              </label>
+                              <input
+                                type="text"
+                                className="input"
+                                style={{ width: '100%', fontSize: '12px' }}
+                                value={motorData.activeTpInsurerName || ''}
+                                onChange={(e) => setMotorData({ ...motorData, activeTpInsurerName: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)', display: 'block', marginBottom: '2px' }}>
+                                TP Policy Number
+                              </label>
+                              <input
+                                type="text"
+                                className="input"
+                                style={{ width: '100%', fontSize: '12px' }}
+                                value={motorData.activeTpPolicyNumber || ''}
+                                onChange={(e) => setMotorData({ ...motorData, activeTpPolicyNumber: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)', display: 'block', marginBottom: '2px' }}>
+                                TP Start Date
+                              </label>
+                              <input
+                                type="date"
+                                className="input"
+                                style={{ width: '100%', fontSize: '12px' }}
+                                value={motorData.activeTpPolicyStartDate || ''}
+                                onChange={(e) => setMotorData({ ...motorData, activeTpPolicyStartDate: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)', display: 'block', marginBottom: '2px' }}>
+                                TP End Date
+                              </label>
+                              <input
+                                type="date"
+                                className="input"
+                                style={{ width: '100%', fontSize: '12px' }}
+                                value={motorData.activeTpPolicyEndDate || ''}
+                                onChange={(e) => setMotorData({ ...motorData, activeTpPolicyEndDate: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Financing & Hypothecation */}
+                        <div style={{ gridColumn: 'span 2', padding: '10px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                          <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-main)', marginBottom: '8px' }}>
+                            Financing & Hypothecation Details
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '8px' }}>
+                            <div>
+                              <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)', display: 'block', marginBottom: '2px' }}>
+                                Financed / Hypothecated
+                              </label>
+                              <select
+                                className="select"
+                                style={{ width: '100%', fontSize: '12px' }}
+                                value={motorData.financed === true ? 'yes' : motorData.financed === false ? 'no' : ''}
+                                onChange={(e) => setMotorData({ ...motorData, financed: e.target.value === 'yes' ? true : e.target.value === 'no' ? false : null })}
+                              >
+                                <option value="">Not Stated</option>
+                                <option value="yes">Yes (Hypothecated)</option>
+                                <option value="no">No</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)', display: 'block', marginBottom: '2px' }}>
+                                Financier / Bank Name
+                              </label>
+                              <input
+                                type="text"
+                                className="input"
+                                style={{ width: '100%', fontSize: '12px' }}
+                                value={motorData.financierName || motorData.loanProvider || ''}
+                                onChange={(e) => setMotorData({ ...motorData, financierName: e.target.value, loanProvider: e.target.value })}
+                                placeholder="e.g. HDFC Bank Ltd / ICICI Bank"
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)', display: 'block', marginBottom: '2px' }}>
+                                Agreement / Account No
+                              </label>
+                              <input
+                                type="text"
+                                className="input"
+                                style={{ width: '100%', fontSize: '12px' }}
+                                value={motorData.hypothecation || ''}
+                                onChange={(e) => setMotorData({ ...motorData, hypothecation: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Add-on Covers Matrix */}
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-main)', display: 'block', marginBottom: '8px' }}>
+                            Add-on Covers & Endorsements
+                          </label>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '10px', backgroundColor: '#f8fafc', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                            {[
+                              { key: 'zeroDepreciation', label: 'Zero Depreciation (Nil Dep / Bumper to Bumper)' },
+                              { key: 'engineProtection', label: 'Engine & Gearbox Protection' },
+                              { key: 'roadsideAssistance', label: '24x7 Roadside Assistance (RSA)' },
+                              { key: 'consumables', label: 'Consumables Expense Cover' },
+                              { key: 'returnToInvoice', label: 'Return to Invoice (RTI)' },
+                              { key: 'ncbProtector', label: 'NCB Retention / Protector' },
+                              { key: 'tyreProtector', label: 'Tyre & Rim Secure' },
+                              { key: 'keyReplacement', label: 'Key & Lock Replacement' },
+                              { key: 'personalBelongings', label: 'Loss of Personal Belongings' },
+                              { key: 'personalAccidentCover', label: 'Owner-Driver Personal Accident (PA Cover)' }
+                            ].map(addon => (
+                              <label key={addon.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={!!motorData[addon.key]}
+                                  onChange={(e) => setMotorData({ ...motorData, [addon.key]: e.target.checked })}
+                                />
+                                <span style={{ fontWeight: motorData[addon.key] ? '600' : '400', color: motorData[addon.key] ? 'var(--color-accent)' : 'var(--color-text-main)' }}>
+                                  {addon.label}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+
+                          {/* Dynamic Add-ons if parsed */}
+                          {motorData.addons && motorData.addons.length > 0 && (
+                            <div style={{ marginTop: '8px' }}>
+                              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--color-text-muted)', marginBottom: '4px' }}>
+                                Detected Add-on Breakdown:
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                {motorData.addons.map((a, idx) => (
+                                  <span key={idx} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1' }}>
+                                    {a.name || a.code}: ₹{a.premium || 0}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : selectedType === 'health' ? (
                       <>
                         <div>
                           <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
@@ -1102,7 +2113,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="text"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={healthDetails.roomRentLimit}
+                            value={healthDetails.roomRentLimit || ''}
                             onChange={(e) => setHealthDetails({ ...healthDetails, roomRentLimit: e.target.value })}
                             placeholder="e.g. 1% of SI or No Capping"
                           />
@@ -1116,7 +2127,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="text"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={healthDetails.icuLimit}
+                            value={healthDetails.icuLimit || ''}
                             onChange={(e) => setHealthDetails({ ...healthDetails, icuLimit: e.target.value })}
                             placeholder="e.g. 2% of SI or No Capping"
                           />
@@ -1130,7 +2141,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="text"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={healthDetails.coPayment}
+                            value={healthDetails.coPayment || ''}
                             onChange={(e) => setHealthDetails({ ...healthDetails, coPayment: e.target.value })}
                             placeholder="0% or 10%"
                           />
@@ -1144,7 +2155,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="number"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={selectedSubtype === 'super_top_up' ? healthDetails.aggregateDeductible : healthDetails.deductible}
+                            value={selectedSubtype === 'super_top_up' ? (healthDetails.aggregateDeductible || '') : (healthDetails.deductible || '')}
                             onChange={(e) => {
                               if (selectedSubtype === 'super_top_up') setHealthDetails({ ...healthDetails, aggregateDeductible: e.target.value });
                               else setHealthDetails({ ...healthDetails, deductible: e.target.value });
@@ -1161,7 +2172,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="text"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={healthDetails.cumulativeBonus}
+                            value={healthDetails.cumulativeBonus || ''}
                             onChange={(e) => setHealthDetails({ ...healthDetails, cumulativeBonus: e.target.value })}
                           />
                         </div>
@@ -1174,14 +2185,12 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="text"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={healthDetails.restorationBenefit}
+                            value={healthDetails.restorationBenefit || ''}
                             onChange={(e) => setHealthDetails({ ...healthDetails, restorationBenefit: e.target.value })}
                           />
                         </div>
                       </>
-                    )}
-
-                    {selectedType === 'life' && (
+                    ) : selectedType === 'life' ? (
                       <>
                         <div>
                           <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
@@ -1191,7 +2200,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="text"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={lifeDetails.uin}
+                            value={lifeDetails.uin || ''}
                             onChange={(e) => setLifeDetails({ ...lifeDetails, uin: e.target.value })}
                           />
                         </div>
@@ -1206,7 +2215,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                               className="input"
                               placeholder="Policy Term"
                               style={{ flex: 1, fontSize: '13px' }}
-                              value={lifeDetails.policyTermYears}
+                              value={lifeDetails.policyTermYears || ''}
                               onChange={(e) => setLifeDetails({ ...lifeDetails, policyTermYears: e.target.value })}
                             />
                             <input
@@ -1214,7 +2223,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                               className="input"
                               placeholder="PPT"
                               style={{ flex: 1, fontSize: '13px' }}
-                              value={lifeDetails.premiumPaymentTermYears}
+                              value={lifeDetails.premiumPaymentTermYears || ''}
                               onChange={(e) => setLifeDetails({ ...lifeDetails, premiumPaymentTermYears: e.target.value })}
                             />
                           </div>
@@ -1228,7 +2237,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="text"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={lifeDetails.deathBenefit}
+                            value={lifeDetails.deathBenefit || ''}
                             onChange={(e) => setLifeDetails({ ...lifeDetails, deathBenefit: e.target.value })}
                           />
                         </div>
@@ -1241,14 +2250,12 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="text"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={lifeDetails.maturityBenefit}
+                            value={lifeDetails.maturityBenefit || ''}
                             onChange={(e) => setLifeDetails({ ...lifeDetails, maturityBenefit: e.target.value })}
                           />
                         </div>
                       </>
-                    )}
-
-                    {selectedSubtype === 'travel' && (
+                    ) : selectedSubtype === 'travel' ? (
                       <>
                         <div>
                           <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
@@ -1258,7 +2265,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="text"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={travelDetails.passportNumber}
+                            value={travelDetails.passportNumber || ''}
                             onChange={(e) => setTravelDetails({ ...travelDetails, passportNumber: e.target.value })}
                           />
                         </div>
@@ -1271,7 +2278,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="text"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={travelDetails.destinationCountry}
+                            value={travelDetails.destinationCountry || ''}
                             onChange={(e) => setTravelDetails({ ...travelDetails, destinationCountry: e.target.value })}
                           />
                         </div>
@@ -1284,14 +2291,12 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="number"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={travelDetails.tripDurationDays}
+                            value={travelDetails.tripDurationDays || ''}
                             onChange={(e) => setTravelDetails({ ...travelDetails, tripDurationDays: e.target.value })}
                           />
                         </div>
                       </>
-                    )}
-
-                    {selectedSubtype === 'home_property' && (
+                    ) : selectedSubtype === 'home_property' ? (
                       <>
                         <div style={{ gridColumn: 'span 2' }}>
                           <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
@@ -1301,7 +2306,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="text"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={propertyDetails.propertyAddress}
+                            value={propertyDetails.propertyAddress || ''}
                             onChange={(e) => setPropertyDetails({ ...propertyDetails, propertyAddress: e.target.value })}
                           />
                         </div>
@@ -1314,7 +2319,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="number"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={propertyDetails.buildingSumInsured}
+                            value={propertyDetails.buildingSumInsured || ''}
                             onChange={(e) => setPropertyDetails({ ...propertyDetails, buildingSumInsured: e.target.value })}
                           />
                         </div>
@@ -1327,65 +2332,189 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                             type="number"
                             className="input"
                             style={{ width: '100%', fontSize: '13px' }}
-                            value={propertyDetails.contentsSumInsured}
+                            value={propertyDetails.contentsSumInsured || ''}
                             onChange={(e) => setPropertyDetails({ ...propertyDetails, contentsSumInsured: e.target.value })}
                           />
                         </div>
                       </>
-                    )}
+                    ) : null}
                   </div>
                 )}
 
-                {/* 4. Premium & Financials */}
+                {/* 5. Premium & Financials */}
                 {activeTab === 'premium' && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    {selectedType === 'motor' && (
+                      <>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                              Basic Own Damage (OD) Premium
+                            </label>
+                            {renderFieldBadge('motor.ownDamagePremium')}
+                          </div>
+                          <input
+                            type="number"
+                            className="input"
+                            style={{ width: '100%', fontSize: '13px' }}
+                            value={motorData.ownDamagePremium || ''}
+                            onChange={(e) => setMotorData({ ...motorData, ownDamagePremium: e.target.value })}
+                            placeholder="₹ OD"
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                              Third Party (TP) Premium
+                            </label>
+                            {renderFieldBadge('motor.thirdPartyPremium')}
+                          </div>
+                          <input
+                            type="number"
+                            className="input"
+                            style={{ width: '100%', fontSize: '13px' }}
+                            value={motorData.thirdPartyPremium || ''}
+                            onChange={(e) => setMotorData({ ...motorData, thirdPartyPremium: e.target.value })}
+                            placeholder="₹ TP"
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                              Personal Accident (PA) Premium
+                            </label>
+                            {renderFieldBadge('motor.personalAccidentPremium')}
+                          </div>
+                          <input
+                            type="number"
+                            className="input"
+                            style={{ width: '100%', fontSize: '13px' }}
+                            value={motorData.personalAccidentPremium || ''}
+                            onChange={(e) => setMotorData({ ...motorData, personalAccidentPremium: e.target.value })}
+                            placeholder="₹ PA"
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                              Add-on Covers Premium
+                            </label>
+                            {renderFieldBadge('motor.addonPremium')}
+                          </div>
+                          <input
+                            type="number"
+                            className="input"
+                            style={{ width: '100%', fontSize: '13px' }}
+                            value={motorData.addonPremium || ''}
+                            onChange={(e) => setMotorData({ ...motorData, addonPremium: e.target.value })}
+                            placeholder="₹ Add-ons"
+                          />
+                        </div>
+                      </>
+                    )}
+
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Basic / Net Premium (excl. GST)
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Basic / Net Premium (excl. GST)
+                        </label>
+                        {renderFieldBadge('premium.basicPremium')}
+                      </div>
                       <input
                         type="number"
                         className="input"
                         style={{ width: '100%', fontSize: '13px' }}
-                        value={policyData.basicPremium}
+                        value={policyData.basicPremium || ''}
                         onChange={(e) => setPolicyData({ ...policyData, basicPremium: e.target.value })}
+                        placeholder="₹ Net Premium"
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        GST / Tax Amount (18%)
-                      </label>
-                      <input
-                        type="number"
-                        className="input"
-                        style={{ width: '100%', fontSize: '13px' }}
-                        value={policyData.gst}
-                        onChange={(e) => setPolicyData({ ...policyData, gst: e.target.value })}
-                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Discounts & Loadings
+                        </label>
+                        {renderFieldBadge('premium.discount')}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="number"
+                          className="input"
+                          placeholder="Discount (-₹)"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={motorData.discount || ''}
+                          onChange={(e) => setMotorData({ ...motorData, discount: e.target.value })}
+                        />
+                        <input
+                          type="number"
+                          className="input"
+                          placeholder="Loading (+₹)"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={motorData.loading || ''}
+                          onChange={(e) => setMotorData({ ...motorData, loading: e.target.value })}
+                        />
+                      </div>
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Gross Paid Premium (INR) *
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          GST (18%) & Cess Amount
+                        </label>
+                        {renderFieldBadge('premium.gst')}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="number"
+                          className="input"
+                          placeholder="GST Amount"
+                          style={{ flex: 1, fontSize: '13px' }}
+                          value={policyData.gst || ''}
+                          onChange={(e) => setPolicyData({ ...policyData, gst: e.target.value })}
+                        />
+                        <input
+                          type="number"
+                          className="input"
+                          placeholder="Cess"
+                          style={{ width: '80px', fontSize: '13px' }}
+                          value={motorData.cess || ''}
+                          onChange={(e) => setMotorData({ ...motorData, cess: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#15803d' }}>
+                          Gross Paid Premium (INR) *
+                        </label>
+                        {renderFieldBadge('premium.finalPremium')}
+                      </div>
                       <input
                         type="number"
                         className="input"
-                        style={{ width: '100%', fontSize: '14px', fontWeight: '700', color: '#15803d' }}
-                        value={policyData.finalPremium}
+                        style={{ width: '100%', fontSize: '14px', fontWeight: '700', color: '#15803d', borderColor: '#86efac' }}
+                        value={policyData.finalPremium || ''}
                         onChange={(e) => setPolicyData({ ...policyData, finalPremium: e.target.value })}
+                        placeholder="₹ Total Gross Premium"
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Payment Frequency
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Payment Frequency
+                        </label>
+                        {renderFieldBadge('premium.frequency', 'CRM Default')}
+                      </div>
                       <select
                         className="select"
                         style={{ width: '100%', fontSize: '13px' }}
-                        value={policyData.premiumFrequency}
+                        value={policyData.premiumFrequency || 'yearly'}
                         onChange={(e) => setPolicyData({ ...policyData, premiumFrequency: e.target.value })}
                       >
                         <option value="yearly">Yearly / Annual</option>
@@ -1398,7 +2527,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                   </div>
                 )}
 
-                {/* 5. Insured Members (For Health / Floater) */}
+                {/* 6. Insured Members (For Health / Floater) */}
                 {activeTab === 'members' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1478,142 +2607,284 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                   </div>
                 )}
 
-                {/* 6. Motor Vehicle Details */}
-                {activeTab === 'motor' && (
+                {/* 6. Nominee Details */}
+                {activeTab === 'nominee' && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Vehicle Registration No. *
-                      </label>
-                      <input
-                        type="text"
-                        className="input"
-                        style={{ width: '100%', fontSize: '13px', fontWeight: '700', textTransform: 'uppercase' }}
-                        value={motorData.registrationNumber}
-                        onChange={(e) => setMotorData({ ...motorData, registrationNumber: e.target.value.toUpperCase() })}
-                        placeholder="MH02EK4921"
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Insured Declared Value - IDV (INR) *
-                      </label>
-                      <input
-                        type="number"
-                        className="input"
-                        style={{ width: '100%', fontSize: '13px', fontWeight: '600' }}
-                        value={motorData.idv}
-                        onChange={(e) => setMotorData({ ...motorData, idv: e.target.value })}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Make & Model
-                      </label>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <input
-                          type="text"
-                          className="input"
-                          placeholder="Make (e.g. Hyundai)"
-                          style={{ flex: 1, fontSize: '13px' }}
-                          value={motorData.make}
-                          onChange={(e) => setMotorData({ ...motorData, make: e.target.value })}
-                        />
-                        <input
-                          type="text"
-                          className="input"
-                          placeholder="Model (e.g. Creta)"
-                          style={{ flex: 1, fontSize: '13px' }}
-                          value={motorData.model}
-                          onChange={(e) => setMotorData({ ...motorData, model: e.target.value })}
-                        />
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Nominee Full Name
+                        </label>
+                        {renderFieldBadge('nominee.name')}
                       </div>
+                      <input
+                        type="text"
+                        className="input"
+                        style={{ width: '100%', fontSize: '13px' }}
+                        value={nomineeData.name || ''}
+                        onChange={(e) => setNomineeData({ ...nomineeData, name: e.target.value })}
+                        placeholder="e.g. Suman Sharma"
+                      />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        NCB Discount (%)
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Relationship with Insured
+                        </label>
+                        {renderFieldBadge('nominee.relationship')}
+                      </div>
+                      <select
+                        className="select"
+                        style={{ width: '100%', fontSize: '13px' }}
+                        value={nomineeData.relation || 'Spouse'}
+                        onChange={(e) => setNomineeData({ ...nomineeData, relation: e.target.value })}
+                      >
+                        <option value="Spouse">Spouse / Husband / Wife</option>
+                        <option value="Son">Son</option>
+                        <option value="Daughter">Daughter</option>
+                        <option value="Father">Father</option>
+                        <option value="Mother">Mother</option>
+                        <option value="Brother">Brother</option>
+                        <option value="Sister">Sister</option>
+                        <option value="Partner">Partner</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Nominee Date of Birth
+                        </label>
+                        {renderFieldBadge('nominee.dob')}
+                      </div>
+                      <input
+                        type="date"
+                        className="input"
+                        style={{ width: '100%', fontSize: '13px' }}
+                        value={nomineeData.dob || ''}
+                        onChange={(e) => setNomineeData({ ...nomineeData, dob: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>
+                          Entitlement Share (%)
+                        </label>
+                        {renderFieldBadge('nominee.share')}
+                      </div>
                       <input
                         type="number"
                         className="input"
                         style={{ width: '100%', fontSize: '13px' }}
-                        value={motorData.ncbPercentage}
-                        onChange={(e) => setMotorData({ ...motorData, ncbPercentage: e.target.value })}
-                        placeholder="0 to 50%"
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Engine Number
-                      </label>
-                      <input
-                        type="text"
-                        className="input"
-                        style={{ width: '100%', fontSize: '13px' }}
-                        value={motorData.engineNumber}
-                        onChange={(e) => setMotorData({ ...motorData, engineNumber: e.target.value.toUpperCase() })}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Chassis Number (VIN)
-                      </label>
-                      <input
-                        type="text"
-                        className="input"
-                        style={{ width: '100%', fontSize: '13px' }}
-                        value={motorData.chassisNumber}
-                        onChange={(e) => setMotorData({ ...motorData, chassisNumber: e.target.value.toUpperCase() })}
+                        value={nomineeData.share || 100}
+                        onChange={(e) => setNomineeData({ ...nomineeData, share: e.target.value })}
                       />
                     </div>
                   </div>
                 )}
 
-                {/* 7. Nominee */}
-                {activeTab === 'nominee' && (
+                {/* 7. Additional / CRM Metadata (Broker & Payment Details) */}
+                {activeTab === 'crm' && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ gridColumn: 'span 2' }}>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Nominee Full Name
-                      </label>
-                      <input
-                        type="text"
-                        className="input"
-                        style={{ width: '100%', fontSize: '13px' }}
-                        value={nomineeData.name}
-                        onChange={(e) => setNomineeData({ ...nomineeData, name: e.target.value })}
-                      />
+                    <div style={{ gridColumn: 'span 2', padding: '10px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-main)', marginBottom: '8px' }}>
+                        Intermediary / Brokerage Information
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)' }}>
+                              Broker / Agency Name
+                            </label>
+                            {renderFieldBadge('brokerDetails.brokerAgency')}
+                          </div>
+                          <input
+                            type="text"
+                            className="input"
+                            style={{ width: '100%', fontSize: '12px' }}
+                            value={brokerData.brokerAgency || ''}
+                            onChange={(e) => setBrokerData({ ...brokerData, brokerAgency: e.target.value })}
+                            placeholder="e.g. INSecure Insurance Broking"
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)' }}>
+                              Agent / POSP Name
+                            </label>
+                            {renderFieldBadge('brokerDetails.agentName')}
+                          </div>
+                          <input
+                            type="text"
+                            className="input"
+                            style={{ width: '100%', fontSize: '12px' }}
+                            value={brokerData.agentName || ''}
+                            onChange={(e) => setBrokerData({ ...brokerData, agentName: e.target.value })}
+                            placeholder="Agent Name"
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)' }}>
+                              Sub-Agent / Reference
+                            </label>
+                            {renderFieldBadge('brokerDetails.subAgent')}
+                          </div>
+                          <input
+                            type="text"
+                            className="input"
+                            style={{ width: '100%', fontSize: '12px' }}
+                            value={brokerData.subAgent || ''}
+                            onChange={(e) => setBrokerData({ ...brokerData, subAgent: e.target.value })}
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)' }}>
+                              Broker Code / Agent Code
+                            </label>
+                            {renderFieldBadge('brokerDetails.agentCode')}
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <input
+                              type="text"
+                              className="input"
+                              placeholder="Broker Code"
+                              style={{ flex: 1, fontSize: '12px' }}
+                              value={brokerData.brokerCode || ''}
+                              onChange={(e) => setBrokerData({ ...brokerData, brokerCode: e.target.value })}
+                            />
+                            <input
+                              type="text"
+                              className="input"
+                              placeholder="Agent Code"
+                              style={{ flex: 1, fontSize: '12px' }}
+                              value={brokerData.agentCode || ''}
+                              onChange={(e) => setBrokerData({ ...brokerData, agentCode: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Relationship with Insured
-                      </label>
-                      <input
-                        type="text"
-                        className="input"
-                        style={{ width: '100%', fontSize: '13px' }}
-                        value={nomineeData.relation}
-                        onChange={(e) => setNomineeData({ ...nomineeData, relation: e.target.value })}
-                      />
-                    </div>
+                    <div style={{ gridColumn: 'span 2', padding: '10px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-main)', marginBottom: '8px' }}>
+                        Payment & Receipt Details
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)' }}>
+                              Payment Status
+                            </label>
+                            {renderFieldBadge('paymentDetails.paymentStatus')}
+                          </div>
+                          <select
+                            className="select"
+                            style={{ width: '100%', fontSize: '12px' }}
+                            value={paymentData.paymentStatus || 'completed'}
+                            onChange={(e) => setPaymentData({ ...paymentData, paymentStatus: e.target.value })}
+                          >
+                            <option value="completed">Completed / Paid</option>
+                            <option value="pending">Pending</option>
+                            <option value="failed">Failed</option>
+                            <option value="refunded">Refunded</option>
+                          </select>
+                        </div>
 
-                    <div>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', display: 'block', marginBottom: '3px' }}>
-                        Entitlement Share (%)
-                      </label>
-                      <input
-                        type="number"
-                        className="input"
-                        style={{ width: '100%', fontSize: '13px' }}
-                        value={nomineeData.share}
-                        onChange={(e) => setNomineeData({ ...nomineeData, share: e.target.value })}
-                      />
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)' }}>
+                              Payment Mode / Method
+                            </label>
+                            {renderFieldBadge('paymentDetails.paymentMethod')}
+                          </div>
+                          <select
+                            className="select"
+                            style={{ width: '100%', fontSize: '12px' }}
+                            value={paymentData.paymentMethod || 'Online'}
+                            onChange={(e) => setPaymentData({ ...paymentData, paymentMethod: e.target.value })}
+                          >
+                            <option value="Online">Online (UPI / NetBanking)</option>
+                            <option value="Credit Card">Credit Card</option>
+                            <option value="Debit Card">Debit Card</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="NEFT/RTGS">NEFT / RTGS</option>
+                            <option value="Cash">Cash</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)' }}>
+                              Payment Date
+                            </label>
+                            {renderFieldBadge('paymentDetails.paymentDate')}
+                          </div>
+                          <input
+                            type="date"
+                            className="input"
+                            style={{ width: '100%', fontSize: '12px' }}
+                            value={paymentData.paymentDate || ''}
+                            onChange={(e) => setPaymentData({ ...paymentData, paymentDate: e.target.value })}
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)' }}>
+                              Payment Amount (INR)
+                            </label>
+                            {renderFieldBadge('paymentDetails.paymentAmount')}
+                          </div>
+                          <input
+                            type="number"
+                            className="input"
+                            style={{ width: '100%', fontSize: '12px' }}
+                            value={paymentData.paymentAmount || ''}
+                            onChange={(e) => setPaymentData({ ...paymentData, paymentAmount: e.target.value })}
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)' }}>
+                              Transaction Reference / UTR
+                            </label>
+                            {renderFieldBadge('paymentDetails.transactionReference')}
+                          </div>
+                          <input
+                            type="text"
+                            className="input"
+                            style={{ width: '100%', fontSize: '12px' }}
+                            value={paymentData.transactionReference || ''}
+                            onChange={(e) => setPaymentData({ ...paymentData, transactionReference: e.target.value })}
+                            placeholder="UTR / Transaction ID"
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '500', color: 'var(--color-text-muted)' }}>
+                              Receipt Number
+                            </label>
+                            {renderFieldBadge('paymentDetails.receiptNumber')}
+                          </div>
+                          <input
+                            type="text"
+                            className="input"
+                            style={{ width: '100%', fontSize: '12px' }}
+                            value={paymentData.receiptNumber || ''}
+                            onChange={(e) => setPaymentData({ ...paymentData, receiptNumber: e.target.value })}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

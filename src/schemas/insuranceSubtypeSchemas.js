@@ -116,7 +116,7 @@ export const SUBTYPE_SCHEMAS = {
     subtype: 'car',
     name: 'Car Insurance (Private 4-Wheeler)',
     entities: { hasMembers: false, hasVehicle: true, hasLifeDetails: false, hasTravelDetails: false, hasPropertyDetails: false },
-    sections: ['customer', 'policy', 'motor', 'coverage', 'premium', 'nominee'],
+    sections: ['customer', 'vehicle', 'policy', 'coverage', 'premium', 'nominee', 'crm'],
     customFields: []
   },
   'two_wheeler': {
@@ -124,7 +124,7 @@ export const SUBTYPE_SCHEMAS = {
     subtype: 'two_wheeler',
     name: 'Two-Wheeler Insurance',
     entities: { hasMembers: false, hasVehicle: true, hasLifeDetails: false, hasTravelDetails: false, hasPropertyDetails: false },
-    sections: ['customer', 'policy', 'motor', 'coverage', 'premium', 'nominee'],
+    sections: ['customer', 'vehicle', 'policy', 'coverage', 'premium', 'nominee', 'crm'],
     customFields: []
   },
   'commercial_vehicle': {
@@ -132,7 +132,7 @@ export const SUBTYPE_SCHEMAS = {
     subtype: 'commercial_vehicle',
     name: 'Commercial Vehicle Insurance',
     entities: { hasMembers: false, hasVehicle: true, hasLifeDetails: false, hasTravelDetails: false, hasPropertyDetails: false },
-    sections: ['customer', 'policy', 'motor', 'coverage', 'premium', 'nominee'],
+    sections: ['customer', 'vehicle', 'policy', 'coverage', 'premium', 'nominee', 'crm'],
     customFields: [
       { key: 'motor.gvw', label: 'Gross Vehicle Weight (GVW Kg)', type: 'number', category: 'motor' },
       { key: 'motor.carryingCapacity', label: 'Carrying Capacity (Tons)', type: 'number', category: 'motor' },
