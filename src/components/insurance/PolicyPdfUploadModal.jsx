@@ -863,10 +863,10 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
           <Loader size={36} className="animate-spin" style={{ color: 'var(--color-accent)' }} />
           <div>
             <h3 style={{ fontSize: '17px', fontWeight: '700', color: 'var(--color-text-main)' }}>
-              Analyzing & Extracting Policy PDF
+              Parsing Document with Docling Engine
             </h3>
-            <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '4px', maxWidth: '420px' }}>
-              Running multi-stage OCR extraction, document classification, family member parsing, and duplicate checks...
+            <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '4px', maxWidth: '460px' }}>
+              Extracting document structure, 2D tabular schedules, layout hierarchy, and performing subtype-specific classification...
             </p>
           </div>
         </div>
@@ -890,7 +890,10 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
             flexWrap: 'wrap',
             gap: '10px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '10.5px', padding: '2px 7px', borderRadius: '4px', backgroundColor: '#e0f2fe', color: '#0369a1', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Docling Extracted
+              </span>
               {/* Only show insurer badge if it was actually detected */}
               {classification?.detectedInsurer && classification.detectedInsurer !== 'General Insurance' && (
                 <span className="badge badge-info" style={{ fontWeight: '700', fontSize: '11px' }}>
