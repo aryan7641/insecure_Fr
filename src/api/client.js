@@ -1,4 +1,4 @@
-// API Client with Backend REST Integration and Intelligent Fallback
+// API Client with Backend REST Integration, Automatic Token Handling, and Fallback
 import * as mockData from './mockData';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -14,6 +14,9 @@ export const apiClient = {
 
       const response = await fetch(`${BASE_URL}${url}`, { headers });
       if (!response.ok) {
+        if (response.status === 401) {
+          handleUnauthorized();
+        }
         throw new Error(`HTTP Error ${response.status}`);
       }
       return await response.json();
@@ -38,6 +41,9 @@ export const apiClient = {
       });
       if (!response.ok) {
         const errorJson = await response.json().catch(() => null);
+        if (response.status === 401) {
+          handleUnauthorized();
+        }
         throw new Error(errorJson?.message || `HTTP Error ${response.status}`);
       }
       return await response.json();
@@ -62,6 +68,9 @@ export const apiClient = {
       });
       if (!response.ok) {
         const errorJson = await response.json().catch(() => null);
+        if (response.status === 401) {
+          handleUnauthorized();
+        }
         throw new Error(errorJson?.message || `HTTP Error ${response.status}`);
       }
       return await response.json();
@@ -83,6 +92,9 @@ export const apiClient = {
         headers
       });
       if (!response.ok) {
+        if (response.status === 401) {
+          handleUnauthorized();
+        }
         throw new Error(`HTTP Error ${response.status}`);
       }
       return await response.json();
@@ -104,6 +116,14 @@ function getAuthHeaders() {
     headers['X-Agency-ID'] = agencyId;
   }
   return headers;
+}
+
+function handleUnauthorized() {
+  const currentPath = window.location.pathname;
+  if (currentPath !== '/login' && currentPath !== '/auth/callback') {
+    localStorage.removeItem('insecure_token');
+    window.location.href = '/login';
+  }
 }
 
 function handleMockGet(url) {

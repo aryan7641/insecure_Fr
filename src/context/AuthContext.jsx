@@ -32,13 +32,40 @@ export const AuthProvider = ({ children }) => {
     }
   }, [currentUser, token, agencyId]);
 
-  // Initial auto-sync with backend login if no valid JWT token is stored
+  // Verify stored token or auto-login on startup
   useEffect(() => {
-    if (!token || token.startsWith('mock-')) {
-      login('admin@apexwealth.in', 'password123', 'Admin').catch(err => {
-        console.warn('Auto-login notice:', err.message);
-      });
+    async function verifyOrLogin() {
+      const storedToken = localStorage.getItem('insecure_token');
+      if (storedToken && !storedToken.startsWith('mock-')) {
+        try {
+          const res = await fetch(`${BASE_URL}/auth/me`, {
+            headers: { 'Authorization': `Bearer ${storedToken}` }
+          });
+          if (res.ok) {
+            const json = await res.json();
+            const userData = json?.data?.user || json?.data;
+            if (userData) {
+              setCurrentUser(userData);
+              const userAgency = userData.activeAgencyId || userData.agencies?.[0]?.agencyId;
+              if (userAgency) {
+                const rawId = typeof userAgency === 'object' ? (userAgency._id || userAgency.id) : userAgency;
+                setAgencyId(rawId);
+              }
+              return;
+            }
+          }
+        } catch (e) {
+          // continue to fallback
+        }
+      }
+
+      // If no valid token, auto-login default admin user
+      if (!storedToken || storedToken.startsWith('mock-')) {
+        login('admin@apexwealth.in', 'password123', 'Admin').catch(() => {});
+      }
     }
+
+    verifyOrLogin();
   }, []);
 
   const login = async (email = 'admin@apexwealth.in', password = 'password123', role = 'Admin') => {
@@ -54,20 +81,22 @@ export const AuthProvider = ({ children }) => {
         const data = json.data || json;
         if (data.accessToken && data.user) {
           setToken(data.accessToken);
+          localStorage.setItem('insecure_token', data.accessToken);
           const activeAgency = data.user.activeAgencyId || (data.user.agencies && data.user.agencies[0]?.agencyId);
           if (activeAgency) {
             const rawId = typeof activeAgency === 'object' ? (activeAgency._id || activeAgency.id) : activeAgency;
             setAgencyId(rawId);
+            localStorage.setItem('insecure_agency_id', rawId);
           }
           setCurrentUser(data.user);
+          localStorage.setItem('insecure_user', JSON.stringify(data.user));
           return data;
         }
       }
     } catch (err) {
-      console.warn('Backend login endpoint unavailable, using mock user fallback:', err.message);
+      console.warn('Backend login endpoint unavailable:', err.message);
     }
 
-    // Local fallback if server unreachable
     const found = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase()) || MOCK_USERS[0];
     setCurrentUser(found);
     return { user: found };
@@ -85,6 +114,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('insecure_user');
     localStorage.removeItem('insecure_token');
     localStorage.removeItem('insecure_agency_id');
+    window.location.href = '/login';
   };
 
   const isAdmin = currentUser?.role?.toLowerCase() === 'admin';
