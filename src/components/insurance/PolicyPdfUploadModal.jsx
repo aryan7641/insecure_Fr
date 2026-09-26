@@ -114,9 +114,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const res = await apiClient.post(`/agencies/${agencyId}/ocr/extract-pdf`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = await apiClient.post(`/agencies/${agencyId}/ocr/extract-pdf`, formData);
 
       const data = res.data || res;
       setExtractedResult(data);

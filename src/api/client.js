@@ -28,17 +28,26 @@ export const apiClient = {
 
   async post(url, data, config = {}) {
     try {
+      const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+      
       const headers = {
-        'Content-Type': 'application/json',
+        ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
         ...getAuthHeaders(),
         ...config.headers
       };
 
+      // Remove Content-Type if FormData to let browser generate boundary
+      if (isFormData) {
+        delete headers['Content-Type'];
+        delete headers['content-type'];
+      }
+
       const response = await fetch(`${BASE_URL}${url}`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(data)
+        body: isFormData ? data : JSON.stringify(data)
       });
+
       if (!response.ok) {
         const errorJson = await response.json().catch(() => null);
         if (response.status === 401) {
@@ -55,17 +64,25 @@ export const apiClient = {
 
   async put(url, data, config = {}) {
     try {
+      const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+      
       const headers = {
-        'Content-Type': 'application/json',
+        ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
         ...getAuthHeaders(),
         ...config.headers
       };
 
+      if (isFormData) {
+        delete headers['Content-Type'];
+        delete headers['content-type'];
+      }
+
       const response = await fetch(`${BASE_URL}${url}`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(data)
+        body: isFormData ? data : JSON.stringify(data)
       });
+
       if (!response.ok) {
         const errorJson = await response.json().catch(() => null);
         if (response.status === 401) {
