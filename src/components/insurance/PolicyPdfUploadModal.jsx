@@ -47,7 +47,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
     mobile: '',
     email: '',
     dob: '',
-    gender: 'male',
+    gender: '',
     pan: '',
     aadhaar: '',
     address: '',
@@ -243,22 +243,28 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
    */
   const renderFieldBadge = (key, customLabel = null) => {
     const info = fieldStatuses[key];
-    const state = info?.state || 'not_found';
+    const state = (info?.state || 'NOT_DETECTED').toUpperCase();
     const source = info?.source;
 
     if (source === 'calculated') {
-      return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#e0f2fe', color: '#0369a1', fontWeight: '600' }}>Calculated</span>;
+      return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#e0f2fe', color: '#0369a1', fontWeight: '600' }}>∑ Calculated</span>;
     }
-    if (state === 'extracted') {
-      return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#dcfce7', color: '#15803d', fontWeight: '600' }}>AI Extracted</span>;
+    if (state === 'EXPLICITLY_EXTRACTED' || state === 'VALIDATED' || state === 'EXTRACTED') {
+      return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#dcfce7', color: '#15803d', fontWeight: '600' }}>✓ AI Extracted</span>;
     }
-    if (state === 'needs_review') {
-      return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#fef3c7', color: '#b45309', fontWeight: '600' }}>Needs Review</span>;
+    if (state === 'LOW_CONFIDENCE' || state === 'NEEDS_REVIEW') {
+      return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#fef3c7', color: '#b45309', fontWeight: '600' }}>⚠ Needs Review</span>;
+    }
+    if (state === 'INVALID_VALUE') {
+      return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#fee2e2', color: '#b91c1c', fontWeight: '600' }}>✕ Invalid</span>;
+    }
+    if (state === 'CONFLICT') {
+      return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#ffedd5', color: '#c2410c', fontWeight: '600' }}>⚡ Conflict</span>;
     }
     if (customLabel) {
       return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#64748b', fontWeight: '500' }}>{customLabel}</span>;
     }
-    return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#f8fafc', color: '#94a3b8', fontWeight: '500' }}>Not Detected</span>;
+    return <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#f8fafc', color: '#94a3b8', fontWeight: '500' }}>○ Not Detected</span>;
   };
 
   /**
@@ -410,7 +416,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
         mobile: extCust.mobile?.value || '',
         email: extCust.email?.value || '',
         dob: extCust.dob?.value ? extCust.dob.value.slice(0, 10) : '',
-        gender: extCust.gender?.value || 'male',
+        gender: extCust.gender?.value || '',
         pan: extCust.pan?.value || '',
         aadhaar: extCust.aadhaar?.value || '',
         address: extCust.address?.value || '',
@@ -1230,9 +1236,10 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                       <select
                         className="select"
                         style={{ width: '100%', fontSize: '13px' }}
-                        value={customerData.gender || 'male'}
+                        value={customerData.gender || ''}
                         onChange={(e) => setCustomerData({ ...customerData, gender: e.target.value })}
                       >
+                        <option value="">-- Select Gender --</option>
                         <option value="male">Male</option>
                         <option value="female">Female</option>
                         <option value="other">Other</option>
