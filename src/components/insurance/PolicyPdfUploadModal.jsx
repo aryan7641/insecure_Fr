@@ -328,7 +328,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
         fetchPresignedPdfUrl(newDocId);
       }
 
-      const ext = data.extractedData || {};
+      const ext = data.extractedData?.extractedData || data.extractedData || {};
       const extCust = ext.customer || {};
       const extPol = ext.policy || {};
       const extPrem = ext.premium || {};
@@ -609,8 +609,9 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
         });
       }
 
-      if (Array.isArray(ext.insuredMembers)) {
-        setInsuredMembers(ext.insuredMembers);
+      const memberCandidates = ext.insuredMembers || extHealth.members || ext.members || [];
+      if (Array.isArray(memberCandidates) && memberCandidates.length > 0) {
+        setInsuredMembers(memberCandidates);
       }
 
       // Default duplicate selection
