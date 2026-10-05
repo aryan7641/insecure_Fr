@@ -29,7 +29,18 @@ export const CustomerFormModal = ({ isOpen, onClose, onSaveSuccess }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const next = { ...prev, [name]: value };
+      if (name === 'name') {
+        const titleMatch = value.trim().match(/^(mr|mrs|ms|miss|shri|smt|master)\b\.?\s*/i);
+        if (titleMatch) {
+          const prefix = titleMatch[1].toLowerCase();
+          if (['mr', 'shri', 'master'].includes(prefix)) next.gender = 'male';
+          else if (['mrs', 'ms', 'miss', 'smt'].includes(prefix)) next.gender = 'female';
+        }
+      }
+      return next;
+    });
   };
 
   const handleNomineeChange = (idx, field, val) => {

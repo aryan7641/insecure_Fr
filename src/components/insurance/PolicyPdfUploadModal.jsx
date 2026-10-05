@@ -445,14 +445,38 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
 
       setFieldStatuses(statuses);
 
+      // Deterministic Title-to-Gender derivation
+      const rawGender = (extCust.gender?.value || '').toLowerCase().trim();
+      const rawTitle = (extCust.title?.value || '').trim();
+      const rawName = (extCust.name?.value || '').trim();
+
+      let extractedGender = '';
+      const cleanT = rawTitle.toLowerCase().replace(/\./g, '').trim();
+      if (['mr', 'shri', 'master', 'mister'].includes(cleanT)) {
+        extractedGender = 'male';
+      } else if (['mrs', 'ms', 'miss', 'smt', 'kumari'].includes(cleanT)) {
+        extractedGender = 'female';
+      } else {
+        const nameMatch = rawName.match(/^(mr|mrs|ms|miss|shri|smt|master)\b\.?\s*/i);
+        if (nameMatch) {
+          const prefix = nameMatch[1].toLowerCase();
+          if (['mr', 'shri', 'master'].includes(prefix)) extractedGender = 'male';
+          else if (['mrs', 'ms', 'miss', 'smt'].includes(prefix)) extractedGender = 'female';
+        } else if (rawGender) {
+          if (rawGender.startsWith('m')) extractedGender = 'male';
+          else if (rawGender.startsWith('f')) extractedGender = 'female';
+          else if (rawGender === 'other') extractedGender = 'other';
+        }
+      }
+
       // Populate draft customer form state
       setCustomerData({
-        title: extCust.title?.value || '',
-        name: extCust.name?.value || '',
+        title: rawTitle || (extractedGender === 'male' ? 'Mr.' : (extractedGender === 'female' ? 'Mrs.' : 'Mr.')),
+        name: rawName,
         mobile: extCust.mobile?.value || '',
         email: extCust.email?.value || '',
         dob: extCust.dob?.value ? extCust.dob.value.slice(0, 10) : '',
-        gender: extCust.gender?.value || '',
+        gender: extractedGender || 'male',
         pan: extCust.pan?.value || '',
         aadhaar: extCust.aadhaar?.value || '',
         address: extCust.address?.value || '',
@@ -1163,7 +1187,23 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                         className="input"
                         style={{ width: '100%', fontSize: '13px' }}
                         value={customerData.name || ''}
-                        onChange={(e) => setCustomerData({ ...customerData, name: e.target.value })}
+                        onChange={(e) => {
+                          const newName = e.target.value;
+                          let autoGender = customerData.gender;
+                          let autoTitle = customerData.title;
+                          const nameMatch = newName.trim().match(/^(mr|mrs|ms|miss|shri|smt|master)\b\.?\s*/i);
+                          if (nameMatch) {
+                            const prefix = nameMatch[1].toLowerCase();
+                            if (['mr', 'shri', 'master'].includes(prefix)) {
+                              autoGender = 'male';
+                              if (!autoTitle || autoTitle === 'Mrs.' || autoTitle === 'Ms.') autoTitle = 'Mr.';
+                            } else if (['mrs', 'ms', 'miss', 'smt'].includes(prefix)) {
+                              autoGender = 'female';
+                              if (!autoTitle || autoTitle === 'Mr.') autoTitle = 'Mrs.';
+                            }
+                          }
+                          setCustomerData({ ...customerData, name: newName, gender: autoGender, title: autoTitle });
+                        }}
                         placeholder="e.g. Rahul Sharma / ABC Logistics Pvt Ltd"
                       />
                     </div>
@@ -1196,8 +1236,18 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                       <select
                         className="select"
                         style={{ width: '100%', fontSize: '13px' }}
-                        value={customerData.title || 'Mr.'}
-                        onChange={(e) => setCustomerData({ ...customerData, title: e.target.value })}
+                        value={customerData.title || (customerData.gender === 'female' ? 'Mrs.' : 'Mr.')}
+                        onChange={(e) => {
+                          const newTitle = e.target.value;
+                          const cleanT = newTitle.toLowerCase().replace(/\./g, '').trim();
+                          let autoGender = customerData.gender;
+                          if (['mr', 'shri', 'master'].includes(cleanT)) {
+                            autoGender = 'male';
+                          } else if (['mrs', 'ms', 'miss', 'smt'].includes(cleanT)) {
+                            autoGender = 'female';
+                          }
+                          setCustomerData({ ...customerData, title: newTitle, gender: autoGender });
+                        }}
                       >
                         <option value="Mr.">Mr.</option>
                         <option value="Mrs.">Mrs.</option>
@@ -1284,8 +1334,17 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                       <select
                         className="select"
                         style={{ width: '100%', fontSize: '13px' }}
-                        value={customerData.gender || ''}
-                        onChange={(e) => setCustomerData({ ...customerData, gender: e.target.value })}
+                        value={(customerData.gender || '').toLowerCase()}
+                        onChange={(e) => {
+                          const newGender = e.target.value;
+                          let autoTitle = customerData.title;
+                          if (newGender === 'male' && (!autoTitle || autoTitle === 'Mrs.' || autoTitle === 'Ms.')) {
+                            autoTitle = 'Mr.';
+                          } else if (newGender === 'female' && (!autoTitle || autoTitle === 'Mr.')) {
+                            autoTitle = 'Mrs.';
+                          }
+                          setCustomerData({ ...customerData, gender: newGender, title: autoTitle });
+                        }}
                       >
                         <option value="">-- Select Gender --</option>
                         <option value="male">Male</option>
