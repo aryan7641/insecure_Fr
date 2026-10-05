@@ -126,6 +126,41 @@ export const PolicyFormModal = ({ isOpen, onClose, customerId, onSaveSuccess }) 
     share: 100
   });
 
+  const [commissionData, setCommissionData] = useState({
+    commissionType: 'percentage',
+    commissionBasis: 'net_premium',
+    commissionPercentage: '',
+    commissionAmount: '',
+    flatAmount: '',
+    commissionStatus: 'pending',
+    remarks: ''
+  });
+
+  const getCommissionBasisAmount = () => {
+    switch (commissionData.commissionBasis) {
+      case 'final_premium':
+        return Number(premiumData.finalPremium || 0);
+      case 'basic_premium':
+        return Number(premiumData.basicPremium || (selectedType === 'motor' ? motorData.ownDamagePremium : 0) || 0);
+      case 'od_premium':
+        return Number(motorData.ownDamagePremium || premiumData.basicPremium || 0);
+      case 'other_premium':
+        return Number(premiumData.otherPremium || 0);
+      case 'net_premium':
+      default:
+        return Number(premiumData.basicPremium || premiumData.finalPremium || 0);
+    }
+  };
+
+  const getComputedCommissionAmount = () => {
+    if (commissionData.commissionType === 'flat') {
+      return Number(commissionData.flatAmount || commissionData.commissionAmount || 0);
+    }
+    const base = getCommissionBasisAmount();
+    const pct = Number(commissionData.commissionPercentage || 0);
+    return Math.round(base * (pct / 100) * 100) / 100;
+  };
+
   useEffect(() => {
     async function loadCustomers() {
       if (!agencyId) return;
@@ -294,6 +329,23 @@ export const PolicyFormModal = ({ isOpen, onClose, customerId, onSaveSuccess }) 
 
       const res = await apiClient.post(`/agencies/${agencyId}/insurance-policies`, payload);
       const created = res.data || res;
+      const createdPolicyId = created.id || created._id;
+
+      if (createdPolicyId && (Number(commissionData.commissionPercentage) > 0 || Number(commissionData.commissionAmount) > 0 || Number(commissionData.flatAmount) > 0)) {
+        try {
+          await apiClient.post(`/agencies/${agencyId}/insurance-policies/${createdPolicyId}/commission`, {
+            commissionType: commissionData.commissionType,
+            commissionBasis: commissionData.commissionBasis,
+            commissionPercentage: Number(commissionData.commissionPercentage) || 0,
+            commissionAmount: getComputedCommissionAmount(),
+            flatAmount: Number(commissionData.flatAmount) || 0,
+            commissionStatus: commissionData.commissionStatus,
+            remarks: commissionData.remarks
+          });
+        } catch (commErr) {
+          console.warn('Initial commission save failed:', commErr);
+        }
+      }
 
       addToast(`Policy #${policyData.policyNumber} created successfully!`, 'success');
       window.dispatchEvent(new CustomEvent('policyCreated', { detail: created }));
@@ -425,6 +477,14 @@ export const PolicyFormModal = ({ isOpen, onClose, customerId, onSaveSuccess }) 
             onClick={() => setActiveTab('nominee')}
           >
             <User size={14} style={{ marginRight: '6px' }} /> {selectedType === 'health' || selectedSubtype === 'group_health' ? '5. Nominee' : '4. Nominee'}
+          </button>
+
+          <button
+            type="button"
+            className={`btn btn-sm ${activeTab === 'commission' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('commission')}
+          >
+            <DollarSign size={14} style={{ marginRight: '6px' }} /> {selectedType === 'health' || selectedSubtype === 'group_health' ? '6. Commission' : '5. Commission'}
           </button>
         </div>
 
@@ -1156,6 +1216,129 @@ export const PolicyFormModal = ({ isOpen, onClose, customerId, onSaveSuccess }) 
                 onChange={(e) => setNomineeData(prev => ({ ...prev, share: e.target.value }))}
                 placeholder="100"
               />
+            </div>
+          </div>
+        )}
+
+        {/* TAB: Commission Management */}
+        {activeTab === 'commission' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontWeight: '700', fontSize: '13px', marginBottom: '4px' }}>
+                <DollarSign size={16} /> Policy Commission Management (Internal CRM)
+              </div>
+              <p style={{ fontSize: '11.5px', color: '#15803d', margin: 0, lineHeight: 1.4 }}>
+                Record manual agent earnings and brokerage commission for this policy.
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label className="form-label">Commission Type *</label>
+                <div style={{ display: 'flex', gap: '16px', marginTop: '6px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: commissionData.commissionType === 'percentage' ? '600' : '400' }}>
+                    <input
+                      type="radio"
+                      name="commissionTypeForm"
+                      value="percentage"
+                      checked={commissionData.commissionType === 'percentage'}
+                      onChange={() => setCommissionData(prev => ({ ...prev, commissionType: 'percentage' }))}
+                    />
+                    Percentage (%)
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: commissionData.commissionType === 'flat' ? '600' : '400' }}>
+                    <input
+                      type="radio"
+                      name="commissionTypeForm"
+                      value="flat"
+                      checked={commissionData.commissionType === 'flat'}
+                      onChange={() => setCommissionData(prev => ({ ...prev, commissionType: 'flat' }))}
+                    />
+                    Flat Amount (₹)
+                  </label>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Commission Status</label>
+                <select
+                  className="form-select"
+                  value={commissionData.commissionStatus}
+                  onChange={(e) => setCommissionData(prev => ({ ...prev, commissionStatus: e.target.value }))}
+                >
+                  <option value="pending">Pending</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
+
+              {commissionData.commissionType === 'percentage' && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">Calculation Basis Premium</label>
+                    <select
+                      className="form-select"
+                      value={commissionData.commissionBasis}
+                      onChange={(e) => setCommissionData(prev => ({ ...prev, commissionBasis: e.target.value }))}
+                    >
+                      <option value="net_premium">Net Premium</option>
+                      <option value="final_premium">Final / Gross Premium</option>
+                      <option value="basic_premium">Basic Premium</option>
+                      {selectedType === 'motor' && <option value="od_premium">OD Premium (Own Damage)</option>}
+                      <option value="other_premium">Other Premium</option>
+                    </select>
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                      Base Amount: <strong>₹{getCommissionBasisAmount().toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Commission Rate (%) *</label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        className="form-input"
+                        value={commissionData.commissionPercentage}
+                        onChange={(e) => setCommissionData(prev => ({ ...prev, commissionPercentage: e.target.value }))}
+                        placeholder="e.g. 15"
+                      />
+                      <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '13px', pointerEvents: 'none' }}>%</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#059669', marginTop: '4px', fontWeight: '600' }}>
+                      Live Commission: ₹{getComputedCommissionAmount().toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {commissionData.commissionType === 'flat' && (
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label className="form-label">Flat Commission Amount (₹) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="form-input"
+                    value={commissionData.flatAmount}
+                    onChange={(e) => setCommissionData(prev => ({ ...prev, flatAmount: e.target.value }))}
+                    placeholder="e.g. 2500"
+                  />
+                </div>
+              )}
+
+              <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <label className="form-label">Commission Notes / Remarks</label>
+                <textarea
+                  className="form-input"
+                  rows={2}
+                  value={commissionData.remarks}
+                  onChange={(e) => setCommissionData(prev => ({ ...prev, remarks: e.target.value }))}
+                  placeholder="Optional internal notes on commission payout or agreement..."
+                />
+              </div>
             </div>
           </div>
         )}
