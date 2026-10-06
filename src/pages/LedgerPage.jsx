@@ -35,7 +35,7 @@ export const LedgerPage = () => {
       let balance = 0;
       const ledgerEntries = polItems.flatMap((p, idx) => {
         const premium = p.premiumAmount || p.premium || p.netPremium || 0;
-        const comm = Math.round((premium * (p.commissionRate || 15)) / 100);
+        const comm = p.commission?.amount ?? (p.commission?.percentage ? Math.round((premium * p.commission.percentage) / 100) : 0);
         const custName = p.customerId?.name || p.customerName || 'Customer';
 
         return [

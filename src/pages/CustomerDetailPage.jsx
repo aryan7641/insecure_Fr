@@ -3,13 +3,14 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   User, Phone, Mail, MapPin, Calendar, CreditCard, Shield, 
   FileText, CalendarCheck, MessageSquare, Activity, DollarSign, Plus, Eye, Loader, UploadCloud, RefreshCw,
-  ArrowLeft, ChevronRight, CheckCircle2, AlertTriangle, ExternalLink
+  ArrowLeft, ChevronRight, CheckCircle2, AlertTriangle, ExternalLink, Percent
 } from 'lucide-react';
 import { Tabs } from '../components/common/Tabs';
 import { PolicyStatusBadge } from '../components/insurance/PolicyStatusBadge';
 import { PolicyPdfUploadModal } from '../components/insurance/PolicyPdfUploadModal';
 import { PolicyFormModal } from '../components/insurance/PolicyFormModal';
 import { WhatsappPreviewModal } from '../components/whatsapp/WhatsappPreviewModal';
+import { CommissionModal } from '../components/commissions/CommissionModal';
 import { apiClient } from '../api/client';
 import { useAgency } from '../context/AgencyContext';
 import { useAuth } from '../context/AuthContext';
@@ -35,6 +36,7 @@ export const CustomerDetailPage = () => {
   const [isManualPolicyModalOpen, setIsManualPolicyModalOpen] = useState(false);
   const [whatsappModal, setWhatsappModal] = useState(false);
   const [selectedPolicyForWhatsapp, setSelectedPolicyForWhatsapp] = useState(null);
+  const [commissionPolicyTarget, setCommissionPolicyTarget] = useState(null);
 
   const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id') || '6ab7424622537587efc9ef30';
 
@@ -49,11 +51,29 @@ export const CustomerDetailPage = () => {
         setCustomer(custData);
       }
 
-      // 2. Load Customer's Policies
-      const polRes = await apiClient.get(`/agencies/${agencyId}/insurance-policies?customerId=${id}`);
+      // 2. Load Customer's Policies & Dedicated Commissions
+      const [polRes, commRes] = await Promise.all([
+        apiClient.get(`/agencies/${agencyId}/insurance-policies?customerId=${id}`),
+        apiClient.get(`/agencies/${agencyId}/commissions?customerId=${id}`).catch(() => ({ data: { commissions: [] } }))
+      ]);
       const polData = polRes?.data?.policies || polRes?.data?.data || polRes?.data || [];
+      const commData = commRes?.data?.commissions || commRes?.data?.data || commRes?.data || [];
+
+      const commMap = {};
+      if (Array.isArray(commData)) {
+        for (const c of commData) {
+          const pId = c.policyId?._id || c.policyId?.id || c.policyId;
+          if (pId) commMap[String(pId)] = c;
+        }
+      }
+
       if (Array.isArray(polData)) {
-        setPolicies(polData);
+        const enrichedPolicies = polData.map(p => {
+          const pId = String(p._id || p.id);
+          const comm = commMap[pId] || p.commission;
+          return { ...p, commission: comm };
+        });
+        setPolicies(enrichedPolicies);
       }
 
       // 3. Load Customer's Documents
@@ -456,6 +476,7 @@ export const CustomerDetailPage = () => {
                   <th>Category</th>
                   <th>Sum Assured</th>
                   <th>Annual Premium</th>
+                  <th>Commission</th>
                   <th>Renewal Date</th>
                   <th>Status</th>
                   <th style={{ textAlign: 'right', paddingRight: '20px' }}>Actions</th>
@@ -464,7 +485,7 @@ export const CustomerDetailPage = () => {
               <tbody>
                 {policies.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)', fontSize: '13px' }}>
+                    <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)', fontSize: '13px' }}>
                       No insurance policies attached yet. Click "+ Upload Policy PDF" above.
                     </td>
                   </tr>
@@ -494,6 +515,24 @@ export const CustomerDetailPage = () => {
                           {formatINR(prem)}
                         </td>
                         <td>
+                          {p.commission && (p.commission.commissionAmount || p.commission.amount || p.commission.commissionPercentage || p.commission.percentage) ? (
+                            <div>
+                              <div style={{ fontWeight: '700', fontSize: '12.5px', color: '#15803d' }}>
+                                {formatINR(p.commission.commissionAmount ?? p.commission.amount ?? 0)}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                                {(p.commission.commissionType === 'flat' || p.commission.type === 'flat')
+                                  ? 'Flat'
+                                  : `${p.commission.commissionPercentage ?? p.commission.percentage ?? 0}% (${(p.commission.commissionBasis || p.commission.basis || 'Net').replace(/_/g, ' ')})`}
+                              </div>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '11.5px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                              Commission not set
+                            </span>
+                          )}
+                        </td>
+                        <td>
                           <span style={{ fontSize: '12.5px', fontWeight: '500' }}>
                             {p.renewalDate ? formatDate(p.renewalDate) : (p.endDate ? formatDate(p.endDate) : '—')}
                           </span>
@@ -502,7 +541,16 @@ export const CustomerDetailPage = () => {
                           <PolicyStatusBadge status={p.status} />
                         </td>
                         <td style={{ textAlign: 'right', paddingRight: '20px' }}>
-                          <div style={{ display: 'inline-flex', gap: '6px' }}>
+                          <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              title="Set or Edit Policy Commission"
+                              onClick={() => setCommissionPolicyTarget(p)}
+                              style={{ padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px' }}
+                            >
+                              <Percent size={12} />
+                              <span>Commission</span>
+                            </button>
                             <button 
                               title="Send WhatsApp Renewal Notice"
                               onClick={() => handleOpenWhatsapp(p)}
@@ -685,6 +733,18 @@ export const CustomerDetailPage = () => {
           onClose={() => setWhatsappModal(false)}
           customer={customer}
           policy={selectedPolicyForWhatsapp}
+        />
+      )}
+
+      {commissionPolicyTarget && (
+        <CommissionModal
+          isOpen={!!commissionPolicyTarget}
+          onClose={() => setCommissionPolicyTarget(null)}
+          policy={commissionPolicyTarget}
+          commission={commissionPolicyTarget.commission}
+          agencyId={agencyId}
+          onSaveSuccess={() => loadData()}
+          onDeleteSuccess={() => loadData()}
         />
       )}
     </div>

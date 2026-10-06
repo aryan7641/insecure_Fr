@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Search, UserPlus, Phone, Shield, UserCheck, 
   MessageSquare, Loader, RefreshCw, MapPin, CreditCard, ArrowUpRight,
-  Mail, Users, Filter, ChevronRight
+  Mail, Users, Filter, ChevronRight, Trash2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAgency } from '../context/AgencyContext';
@@ -11,6 +11,7 @@ import { apiClient } from '../api/client';
 import { CustomerFormModal } from '../components/customers/CustomerFormModal';
 import { ReassignCustomerModal } from '../components/customers/ReassignCustomerModal';
 import { WhatsappPreviewModal } from '../components/whatsapp/WhatsappPreviewModal';
+import { DeleteCustomerModal } from '../components/customers/DeleteCustomerModal';
 import { formatINR, formatDate } from '../utils/formatters';
 
 export const CustomersPage = () => {
@@ -25,6 +26,7 @@ export const CustomersPage = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [reassignCustomer, setReassignCustomer] = useState(null);
   const [whatsappCustomer, setWhatsappCustomer] = useState(null);
+  const [deleteCustomerTarget, setDeleteCustomerTarget] = useState(null);
 
   const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id') || '6ab7424622537587efc9ef30';
 
@@ -316,6 +318,21 @@ export const CustomersPage = () => {
                             <span>Profile</span>
                             <ChevronRight size={13} />
                           </button>
+
+                          {isAdmin && (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              title="Delete Customer Profile"
+                              onClick={() => setDeleteCustomerTarget(c)}
+                              style={{
+                                padding: '5px 8px',
+                                color: '#dc2626',
+                                borderColor: 'rgba(220, 38, 38, 0.25)'
+                              }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -339,6 +356,16 @@ export const CustomersPage = () => {
         onClose={() => setReassignCustomer(null)}
         customer={reassignCustomer}
         onSaveSuccess={() => fetchCustomers()}
+      />
+
+      <DeleteCustomerModal
+        isOpen={!!deleteCustomerTarget}
+        onClose={() => setDeleteCustomerTarget(null)}
+        customer={deleteCustomerTarget}
+        agencyId={agencyId}
+        onDeleteSuccess={(deletedId) => {
+          setCustomers(prev => prev.filter(cust => (cust.id || cust._id) !== deletedId));
+        }}
       />
 
       {whatsappCustomer && (

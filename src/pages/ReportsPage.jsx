@@ -98,15 +98,15 @@ export const ReportsPage = () => {
       headers = ['Policy Number', 'Customer Name', 'Insurer', 'Line of Business', 'Premium (INR)', 'Commission Rate (%)', 'Commission Amount (INR)', 'Status'];
       rows = policies.map(p => {
         const premium = p.premiumAmount || p.premium || 0;
-        const rate = p.commissionRate || 12;
-        const commAmt = Math.round((premium * rate) / 100);
+        const rate = p.commission?.percentage ?? (p.commission?.commissionPercentage ?? 0);
+        const commAmt = p.commission?.amount ?? (p.commission?.commissionAmount ?? (rate ? Math.round((premium * rate) / 100) : 0));
         return [
           `"${p.policyNumber || ''}"`,
           `"${p.customerId?.name || p.customerName || ''}"`,
           `"${p.insurerName || p.insuranceCompany || ''}"`,
           `"${(p.lob || p.policyType || '').toUpperCase()}"`,
           premium,
-          `${rate}%`,
+          rate ? `${rate}%` : '0%',
           commAmt,
           `"${p.status === 'active' || p.status === 'renewed' ? 'Received' : 'Pending'}"`
         ];
