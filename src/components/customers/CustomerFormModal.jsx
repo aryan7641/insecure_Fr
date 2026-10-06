@@ -93,7 +93,9 @@ export const CustomerFormModal = ({ isOpen, onClose, onSaveSuccess }) => {
       }
     }
     if (!agencyId || agencyId === 'agency-1') {
-      agencyId = '6ab7424622537587efc9ef30';
+      addToast('No active agency context found. Please log in again.', 'error');
+      setIsSubmitting(false);
+      return;
     }
     
     try {

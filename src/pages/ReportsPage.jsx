@@ -29,7 +29,7 @@ export const ReportsPage = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id') || '6ab7424622537587efc9ef30';
+  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
 
   const loadReportData = useCallback(async () => {
     if (!agencyId) return;

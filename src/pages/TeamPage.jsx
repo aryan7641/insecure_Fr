@@ -30,7 +30,7 @@ export const TeamPage = () => {
     phone: ''
   });
 
-  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id') || '6ab7424622537587efc9ef30';
+  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
 
   const loadTeamData = useCallback(async () => {
     if (!agencyId) return;

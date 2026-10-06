@@ -152,39 +152,39 @@ function handleUnauthorized() {
 
 function handleMockGet(url) {
   if (url.includes('/customers')) {
-    return { status: 'success', data: { data: mockData.MOCK_CUSTOMERS, customers: mockData.MOCK_CUSTOMERS } };
+    return { status: 'success', data: { data: [], customers: [] } };
   }
-  if (url.includes('/insurance')) {
-    return { status: 'success', data: mockData.MOCK_POLICIES };
+  if (url.includes('/insurance') || url.includes('/insurance-policies')) {
+    return { status: 'success', data: { policies: [], data: [] } };
   }
   if (url.includes('/mutual-funds')) {
-    return { status: 'success', data: mockData.MOCK_MUTUAL_FUNDS };
+    return { status: 'success', data: [] };
   }
   if (url.includes('/sips')) {
-    return { status: 'success', data: mockData.MOCK_SIPS };
+    return { status: 'success', data: [] };
   }
-  if (url.includes('/followups')) {
-    return { status: 'success', data: mockData.MOCK_FOLLOWUPS };
+  if (url.includes('/followups') || url.includes('/follow-ups')) {
+    return { status: 'success', data: { followUps: [], data: [] } };
   }
   if (url.includes('/documents')) {
-    return { status: 'success', data: mockData.MOCK_DOCUMENTS };
+    return { status: 'success', data: { documents: [], data: [] } };
   }
   if (url.includes('/templates')) {
-    return { status: 'success', data: mockData.MOCK_WHATSAPP_TEMPLATES };
+    return { status: 'success', data: { templates: [], data: [] } };
   }
   if (url.includes('/activity')) {
-    return { status: 'success', data: mockData.MOCK_ACTIVITY };
+    return { status: 'success', data: { activities: [], data: [] } };
   }
   if (url.includes('/analytics')) {
     return {
       status: 'success',
       data: {
-        totalCustomers: 3,
-        activePolicies: 3,
-        expiringPolicies: 2,
-        totalSipAmount: 55000,
-        totalPortfolioValue: 5670000,
-        totalInvested: 4400000
+        totalCustomers: 0,
+        activePolicies: 0,
+        expiringPolicies: 0,
+        totalSipAmount: 0,
+        totalPortfolioValue: 0,
+        totalInvested: 0
       }
     };
   }

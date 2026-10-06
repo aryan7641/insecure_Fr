@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { MOCK_USERS } from '../api/mockData';
 
 const AuthContext = createContext(null);
 
@@ -8,7 +7,11 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('insecure_user');
-    return saved ? JSON.parse(saved) : MOCK_USERS[0];
+    try {
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
   });
 
   const [token, setToken] = useState(() => localStorage.getItem('insecure_token') || '');
@@ -29,12 +32,14 @@ export const AuthProvider = ({ children }) => {
 
     if (agencyId) {
       localStorage.setItem('insecure_agency_id', agencyId);
+    } else {
+      localStorage.removeItem('insecure_agency_id');
     }
   }, [currentUser, token, agencyId]);
 
-  // Verify stored token or auto-login on startup
+  // Verify stored token on startup
   useEffect(() => {
-    async function verifyOrLogin() {
+    async function verifyToken() {
       const storedToken = localStorage.getItem('insecure_token');
       if (storedToken && !storedToken.startsWith('mock-')) {
         try {
@@ -55,28 +60,30 @@ export const AuthProvider = ({ children }) => {
               return;
             }
           } else {
-            // Expired or invalid token: clean storage so app is in fresh state
+            // Expired or invalid token: clean storage so app stays in clean state
+            setCurrentUser(null);
+            setToken('');
+            setAgencyId('');
             localStorage.removeItem('insecure_token');
             localStorage.removeItem('insecure_user');
+            localStorage.removeItem('insecure_agency_id');
+            localStorage.removeItem('insecure_agency');
           }
         } catch (e) {
-          // network error fallback
+          // Network error: preserve existing cached user if present
         }
       }
-
-      // If no valid session token exists, auto-login default admin user to provide seamless experience
-      await login('admin@apexwealth.in', 'password123', 'Admin').catch(() => {});
     }
 
-    verifyOrLogin();
+    verifyToken();
   }, []);
 
-  const login = async (email = 'admin@apexwealth.in', password = 'password123', role = 'Admin') => {
+  const login = async (email, password, role = 'ADMIN') => {
     try {
       const res = await fetch(`${BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, role: role.toUpperCase() })
+        body: JSON.stringify({ email, password, role: (role || 'ADMIN').toUpperCase() })
       });
 
       if (res.ok) {
@@ -95,19 +102,22 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem('insecure_user', JSON.stringify(data.user));
           return data;
         }
+      } else {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.message || 'Invalid email or password');
       }
     } catch (err) {
-      console.warn('Backend login endpoint unavailable:', err.message);
+      console.warn('Backend login endpoint error:', err.message);
+      throw err;
     }
-
-    const found = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase()) || MOCK_USERS[0];
-    setCurrentUser(found);
-    return { user: found };
   };
 
   const switchRole = (role) => {
-    const matched = MOCK_USERS.find(u => u.role === role) || MOCK_USERS[0];
-    login(matched.email, 'password', matched.role);
+    if (currentUser) {
+      const updated = { ...currentUser, role: role.toLowerCase() };
+      setCurrentUser(updated);
+      localStorage.setItem('insecure_user', JSON.stringify(updated));
+    }
   };
 
   const logout = () => {
@@ -117,6 +127,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('insecure_user');
     localStorage.removeItem('insecure_token');
     localStorage.removeItem('insecure_agency_id');
+    localStorage.removeItem('insecure_agency');
     window.location.href = '/login';
   };
 

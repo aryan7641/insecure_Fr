@@ -1,25 +1,31 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { MOCK_AGENCIES } from '../api/mockData';
 import { apiClient } from '../api/client';
 
 const AgencyContext = createContext(null);
 
 export const AgencyProvider = ({ children }) => {
-  const [agencies, setAgencies] = useState(MOCK_AGENCIES);
+  const [agencies, setAgencies] = useState([]);
   const [currentAgency, setCurrentAgency] = useState(() => {
     const saved = localStorage.getItem('insecure_agency');
-    return saved ? JSON.parse(saved) : MOCK_AGENCIES[0];
+    try {
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
   });
 
   useEffect(() => {
     async function loadAgencies() {
+      const storedToken = localStorage.getItem('insecure_token');
+      if (!storedToken) return;
+
       try {
         const res = await apiClient.get('/agencies');
         const list = res?.data?.agencies || res?.data?.data || (Array.isArray(res?.data) ? res.data : []);
         if (Array.isArray(list) && list.length > 0) {
           setAgencies(list);
           const savedAgencyId = localStorage.getItem('insecure_agency_id');
-          const matched = list.find(a => (a.id || a._id) === savedAgencyId) || list[0];
+          const matched = (savedAgencyId ? list.find(a => (a.id || a._id) === savedAgencyId) : null) || list[0];
           setCurrentAgency(matched);
           const rawId = matched.id || matched._id;
           if (rawId) {
@@ -27,7 +33,7 @@ export const AgencyProvider = ({ children }) => {
           }
         }
       } catch (e) {
-        // use fallback
+        // network error
       }
     }
     loadAgencies();
@@ -37,9 +43,11 @@ export const AgencyProvider = ({ children }) => {
     if (currentAgency) {
       localStorage.setItem('insecure_agency', JSON.stringify(currentAgency));
       const agencyId = currentAgency.id || currentAgency._id;
-      if (agencyId && agencyId !== 'agency-1') {
+      if (agencyId) {
         localStorage.setItem('insecure_agency_id', agencyId);
       }
+    } else {
+      localStorage.removeItem('insecure_agency');
     }
   }, [currentAgency]);
 

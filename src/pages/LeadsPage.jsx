@@ -53,7 +53,7 @@ export const LeadsPage = () => {
     notes: ''
   });
 
-  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id') || '6ab7424622537587efc9ef30';
+  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
 
   // Load leads from storage / backend
   const loadLeads = useCallback(async () => {

@@ -29,7 +29,7 @@ export const CommissionsPage = () => {
   const [activeModalTarget, setActiveModalTarget] = useState(null); // { policy, commission }
   const [isSelectPolicyOpen, setIsSelectPolicyOpen] = useState(false);
 
-  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id') || '6ab7424622537587efc9ef30';
+  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
 
   const fetchData = useCallback(async () => {
     if (!agencyId) return;

@@ -272,7 +272,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
   // Field status tracking (e.g. 'extracted' | 'needs_review' | 'not_found')
   const [fieldStatuses, setFieldStatuses] = useState({});
 
-  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id') || '6ab7424622537587efc9ef30';
+  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
 
   /**
    * Helper badge to clearly distinguish AI Extracted vs Manual vs Calculated vs Needs Review

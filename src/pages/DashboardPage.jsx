@@ -32,10 +32,13 @@ export const DashboardPage = () => {
   // Active Segment for Interactive Performance View
   const [activeChartSegment, setActiveChartSegment] = useState('premium'); // 'premium' | 'lob' | 'renewals' | 'commissions'
 
-  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id') || '6ab7424622537587efc9ef30';
+  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
 
   const loadDashboardData = useCallback(async () => {
-    if (!agencyId) return;
+    if (!agencyId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       // 1. Fetch Customers

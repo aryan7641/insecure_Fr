@@ -18,7 +18,7 @@ export const PolicyFormModal = ({ isOpen, onClose, customerId, onSaveSuccess }) 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('policy'); // 'policy' | 'premium' | 'subtype_details' | 'members' | 'nominee'
 
-  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id') || '6ab7424622537587efc9ef30';
+  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
 
   // Core Type & Subtype State
   const [selectedType, setSelectedType] = useState('health');

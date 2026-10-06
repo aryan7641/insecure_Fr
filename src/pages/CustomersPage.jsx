@@ -28,7 +28,7 @@ export const CustomersPage = () => {
   const [whatsappCustomer, setWhatsappCustomer] = useState(null);
   const [deleteCustomerTarget, setDeleteCustomerTarget] = useState(null);
 
-  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id') || '6ab7424622537587efc9ef30';
+  const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
 
   const fetchCustomers = useCallback(async () => {
     if (!agencyId) return;

@@ -6,16 +6,20 @@ import { Lock, Loader } from 'lucide-react';
 export const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@apexwealth.in');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMsg('');
     setLoading(true);
     try {
       await login(email, password);
       navigate('/dashboard');
+    } catch (err) {
+      setErrorMsg(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -100,6 +104,20 @@ export const LoginPage = () => {
           <span style={{ padding: '0 10px' }}>OR SIGN IN WITH EMAIL</span>
           <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }} />
         </div>
+
+        {errorMsg && (
+          <div style={{
+            padding: '10px 14px',
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#dc2626',
+            borderRadius: '8px',
+            fontSize: '13px',
+            marginBottom: '16px'
+          }}>
+            {errorMsg}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
