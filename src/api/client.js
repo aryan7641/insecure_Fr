@@ -53,7 +53,9 @@ export const apiClient = {
         if (response.status === 401) {
           handleUnauthorized();
         }
-        throw new Error(errorJson?.message || `HTTP Error ${response.status}`);
+        const err = new Error(errorJson?.message || `HTTP Error ${response.status}`);
+        err.response = { status: response.status, data: errorJson };
+        throw err;
       }
       return await response.json();
     } catch (err) {
@@ -88,7 +90,9 @@ export const apiClient = {
         if (response.status === 401) {
           handleUnauthorized();
         }
-        throw new Error(errorJson?.message || `HTTP Error ${response.status}`);
+        const err = new Error(errorJson?.message || `HTTP Error ${response.status}`);
+        err.response = { status: response.status, data: errorJson };
+        throw err;
       }
       return await response.json();
     } catch (err) {
@@ -109,10 +113,13 @@ export const apiClient = {
         headers
       });
       if (!response.ok) {
+        const errorJson = await response.json().catch(() => null);
         if (response.status === 401) {
           handleUnauthorized();
         }
-        throw new Error(`HTTP Error ${response.status}`);
+        const err = new Error(errorJson?.message || `HTTP Error ${response.status}`);
+        err.response = { status: response.status, data: errorJson };
+        throw err;
       }
       return await response.json();
     } catch (err) {
