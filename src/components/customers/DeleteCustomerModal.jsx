@@ -30,12 +30,7 @@ export const DeleteCustomerModal = ({ isOpen, onClose, customer, agencyId, onDel
         : `/agencies/${agencyId}/customers/${customerId}`;
       
       const res = await apiClient.delete(url);
-      const isDeactivated = mode === 'deactivate' || res?.data?.data?.deactivated;
-      
-      addToast(
-        isDeactivated ? `Customer ${customer.name} deactivated successfully` : `Customer ${customer.name} deleted successfully`,
-        'success'
-      );
+      addToast(`Customer ${customer.name} deleted successfully`, 'success');
       
       if (onDeleteSuccess) {
         onDeleteSuccess(customerId);
@@ -59,7 +54,7 @@ export const DeleteCustomerModal = ({ isOpen, onClose, customer, agencyId, onDel
     <Modal
       isOpen={isOpen}
       onClose={() => !loading && onClose()}
-      title={hasDependencies ? 'Deactivate Customer Profile' : 'Delete Customer Profile'}
+      title="Delete Customer Profile"
       maxWidth="460px"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -68,14 +63,14 @@ export const DeleteCustomerModal = ({ isOpen, onClose, customer, agencyId, onDel
             width: '42px',
             height: '42px',
             borderRadius: '10px',
-            backgroundColor: hasDependencies ? '#fffbeb' : '#fef2f2',
-            color: hasDependencies ? '#d97706' : '#dc2626',
+            backgroundColor: '#fef2f2',
+            color: '#dc2626',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0
           }}>
-            {hasDependencies ? <AlertTriangle size={22} /> : <Trash2 size={22} />}
+            <Trash2 size={22} />
           </div>
 
           <div>
@@ -102,7 +97,7 @@ export const DeleteCustomerModal = ({ isOpen, onClose, customer, agencyId, onDel
               This customer has existing policies or related records and cannot be permanently deleted without removing associated data.
             </p>
             <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#b45309' }}>
-              Safe deactivation will remove the customer from the directory while keeping all insurance policies, historical premium data, and audit records completely intact.
+              Deleting will safely remove the customer profile from the directory while keeping all insurance policies, historical premium data, and audit records completely intact.
             </p>
           </div>
         ) : (
@@ -121,43 +116,23 @@ export const DeleteCustomerModal = ({ isOpen, onClose, customer, agencyId, onDel
             Cancel
           </button>
 
-          {hasDependencies ? (
-            <button
-              type="button"
-              className="btn btn-warning"
-              onClick={() => handleDelete('deactivate')}
-              disabled={loading}
-              style={{
-                backgroundColor: '#d97706',
-                color: '#ffffff',
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              {loading ? <Loader size={14} className="animate-spin" /> : <UserX size={14} />}
-              Deactivate Customer
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={() => handleDelete('delete')}
-              disabled={loading}
-              style={{
-                backgroundColor: '#dc2626',
-                color: '#ffffff',
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              {loading ? <Loader size={14} className="animate-spin" /> : <Trash2 size={14} />}
-              Delete Customer
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={() => handleDelete(hasDependencies ? 'deactivate' : 'delete')}
+            disabled={loading}
+            style={{
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            {loading ? <Loader size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            Delete Customer
+          </button>
         </div>
       </div>
     </Modal>
