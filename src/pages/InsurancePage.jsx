@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Shield, Search, Filter, UploadCloud, MessageSquare, 
-  RefreshCw, FileText, Loader, ExternalLink, AlertCircle, CheckCircle, ChevronRight, User
+  RefreshCw, FileText, Loader, ExternalLink, AlertCircle, CheckCircle, ChevronRight, User,
+  FileCheck
 } from 'lucide-react';
 import { PolicyStatusBadge } from '../components/insurance/PolicyStatusBadge';
 import { PolicyFormModal } from '../components/insurance/PolicyFormModal';
 import { PolicyPdfUploadModal } from '../components/insurance/PolicyPdfUploadModal';
+import { PolicyDocumentsModal } from '../components/insurance/PolicyDocumentsModal';
 import { WhatsappPreviewModal } from '../components/whatsapp/WhatsappPreviewModal';
 import { useAuth } from '../context/AuthContext';
 import { useAgency } from '../context/AgencyContext';
@@ -32,6 +34,7 @@ export const InsurancePage = () => {
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [whatsappCustomer, setWhatsappCustomer] = useState(null);
   const [selectedPolicyForWhatsapp, setSelectedPolicyForWhatsapp] = useState(null);
+  const [selectedPolicyForDocs, setSelectedPolicyForDocs] = useState(null);
 
   const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
 
@@ -463,6 +466,16 @@ export const InsurancePage = () => {
                               <FileText size={13} />
                             </a>
                           )}
+
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            title="Manage Policy KYC Documents (Aadhaar, PAN, RC, GST Certificate)"
+                            onClick={() => setSelectedPolicyForDocs(p)}
+                            style={{ padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px' }}
+                          >
+                            <FileCheck size={13} style={{ color: 'var(--color-primary)' }} />
+                            <span>Docs</span>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -493,6 +506,15 @@ export const InsurancePage = () => {
           onClose={() => { setWhatsappCustomer(null); setSelectedPolicyForWhatsapp(null); }}
           customer={whatsappCustomer}
           policy={selectedPolicyForWhatsapp}
+        />
+      )}
+
+      {selectedPolicyForDocs && (
+        <PolicyDocumentsModal
+          isOpen={!!selectedPolicyForDocs}
+          onClose={() => setSelectedPolicyForDocs(null)}
+          policy={selectedPolicyForDocs}
+          onDocumentsUpdated={() => fetchPolicies()}
         />
       )}
     </div>

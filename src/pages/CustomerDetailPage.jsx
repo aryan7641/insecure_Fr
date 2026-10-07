@@ -3,12 +3,13 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   User, Phone, Mail, MapPin, Calendar, CreditCard, Shield, 
   FileText, CalendarCheck, MessageSquare, Activity, DollarSign, Plus, Eye, Loader, UploadCloud, RefreshCw,
-  ArrowLeft, ChevronRight, CheckCircle2, AlertTriangle, ExternalLink, Percent
+  ArrowLeft, ChevronRight, CheckCircle2, AlertTriangle, ExternalLink, Percent, FileCheck
 } from 'lucide-react';
 import { Tabs } from '../components/common/Tabs';
 import { PolicyStatusBadge } from '../components/insurance/PolicyStatusBadge';
 import { PolicyPdfUploadModal } from '../components/insurance/PolicyPdfUploadModal';
 import { PolicyFormModal } from '../components/insurance/PolicyFormModal';
+import { PolicyDocumentsModal } from '../components/insurance/PolicyDocumentsModal';
 import { WhatsappPreviewModal } from '../components/whatsapp/WhatsappPreviewModal';
 import { CommissionModal } from '../components/commissions/CommissionModal';
 import { apiClient } from '../api/client';
@@ -37,6 +38,7 @@ export const CustomerDetailPage = () => {
   const [whatsappModal, setWhatsappModal] = useState(false);
   const [selectedPolicyForWhatsapp, setSelectedPolicyForWhatsapp] = useState(null);
   const [commissionPolicyTarget, setCommissionPolicyTarget] = useState(null);
+  const [selectedPolicyForDocs, setSelectedPolicyForDocs] = useState(null);
 
   const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
 
@@ -580,6 +582,15 @@ export const CustomerDetailPage = () => {
                                 <FileText size={13} />
                               </a>
                             )}
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              title="Manage Policy KYC Documents (Aadhaar, PAN, RC, GST Certificate)"
+                              onClick={() => setSelectedPolicyForDocs(p)}
+                              style={{ padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px' }}
+                            >
+                              <FileCheck size={13} style={{ color: 'var(--color-primary)' }} />
+                              <span>Docs</span>
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -745,6 +756,15 @@ export const CustomerDetailPage = () => {
           agencyId={agencyId}
           onSaveSuccess={() => loadData()}
           onDeleteSuccess={() => loadData()}
+        />
+      )}
+
+      {selectedPolicyForDocs && (
+        <PolicyDocumentsModal
+          isOpen={!!selectedPolicyForDocs}
+          onClose={() => setSelectedPolicyForDocs(null)}
+          policy={selectedPolicyForDocs}
+          onDocumentsUpdated={() => loadData()}
         />
       )}
     </div>
