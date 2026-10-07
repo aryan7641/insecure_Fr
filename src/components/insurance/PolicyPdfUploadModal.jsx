@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   UploadCloud, FileText, CheckCircle2, AlertTriangle, 
   Shield, User, Car, DollarSign, Users, Loader, RefreshCw, XCircle, ArrowRight,
-  ExternalLink, ZoomIn, ZoomOut, Check, ChevronDown, Sparkles, Building2, Plane, Home
+  ExternalLink, ZoomIn, ZoomOut, Check, ChevronDown, Sparkles, Building2, Plane, Home,
+  FileCheck
 } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { useToast } from '../../context/ToastContext';
@@ -39,6 +40,33 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
 
   // Active Tab in Review Right Panel
   const [activeTab, setActiveTab] = useState('customer');
+
+  // Policy KYC & Regulatory Documents State (Optional)
+  const [policyDocsToUpload, setPolicyDocsToUpload] = useState({
+    AADHAAR: null,
+    PAN: null,
+    RC: null,
+    GST_CERTIFICATE: null
+  });
+
+  const handleSelectDoc = (type, file) => {
+    if (!file) return;
+    const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowed.includes(file.type) && !file.name.match(/\.(pdf|jpe?g|png)$/i)) {
+      addToast('Only PDF, JPG, and PNG files are accepted', 'warning');
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      addToast('File size must be under 15 MB', 'warning');
+      return;
+    }
+    setPolicyDocsToUpload(prev => ({ ...prev, [type]: file }));
+    addToast(`${file.name} attached for ${type}`, 'info');
+  };
+
+  const handleRemoveDoc = (type) => {
+    setPolicyDocsToUpload(prev => ({ ...prev, [type]: null }));
+  };
 
   // Editable Form State
   const [customerData, setCustomerData] = useState({
@@ -755,8 +783,37 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
         insuredMembers: currentSubtypeSchema.entities.hasMembers ? insuredMembers : []
       };
 
-      await apiClient.post(`/agencies/${agencyId}/ocr/${documentId}/confirm-policy`, payload);
-      addToast('Policy successfully created and verified!', 'success');
+      const confirmRes = await apiClient.post(`/agencies/${agencyId}/ocr/${documentId}/confirm-policy`, payload);
+      const createdPolicy = confirmRes?.data?.data?.policy || confirmRes?.data?.policy;
+      const createdPolicyId = createdPolicy?._id;
+
+      // Upload optional KYC documents if any were attached by agent
+      const docsToUploadEntries = Object.entries(policyDocsToUpload).filter(([_, file]) => !!file);
+      let uploadedDocsCount = 0;
+
+      if (createdPolicyId && docsToUploadEntries.length > 0) {
+        for (const [docType, file] of docsToUploadEntries) {
+          try {
+            const formData = new FormData();
+            formData.append('documentType', docType);
+            formData.append('file', file);
+            await apiClient.post(`/agencies/${agencyId}/insurance-policies/${createdPolicyId}/documents`, formData, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            uploadedDocsCount++;
+          } catch (uploadErr) {
+            console.warn(`[KYC Upload] Failed to upload ${docType}:`, uploadErr.message);
+            addToast(`Policy saved, but failed to upload ${docType}: ${uploadErr.response?.data?.message || uploadErr.message}`, 'warning');
+          }
+        }
+      }
+
+      addToast(
+        uploadedDocsCount > 0
+          ? `Policy successfully created and ${uploadedDocsCount} KYC document(s) uploaded!`
+          : 'Policy successfully created and verified!',
+        'success'
+      );
       if (onSaveSuccess) onSaveSuccess();
       handleClose();
     } catch (err) {
@@ -775,6 +832,12 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
     setPresignedPdfUrl(null);
     setIsFetchingPdfUrl(false);
     setClassification(null);
+    setPolicyDocsToUpload({
+      AADHAAR: null,
+      PAN: null,
+      RC: null,
+      GST_CERTIFICATE: null
+    });
     onClose();
   };
 
@@ -1079,6 +1142,51 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
             </div>
           )}
 
+          {/* Post-Extraction KYC Document Prompt Banner (Optional) */}
+          <div style={{
+            padding: '10px 14px',
+            backgroundColor: '#eff6ff',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid #bfdbfe',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileCheck size={18} style={{ color: '#2563eb', flexShrink: 0 }} />
+              <div>
+                <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#1e40af' }}>
+                  Policy Details Extracted!
+                </span>
+                <span style={{ fontSize: '12px', color: '#1e3a8a', marginLeft: '6px' }}>
+                  Option to attach Aadhaar, PAN, RC, or GST Certificate now — <em>strictly optional</em>.
+                </span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => setActiveTab('documents')}
+                style={{ fontSize: '11.5px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <UploadCloud size={13} />
+                <span>{Object.values(policyDocsToUpload).some(Boolean) ? `Docs Attached (${Object.values(policyDocsToUpload).filter(Boolean).length})` : 'Upload Docs (Optional)'}</span>
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  if (activeTab === 'documents') setActiveTab('customer');
+                }}
+                style={{ fontSize: '11.5px', padding: '4px 8px' }}
+              >
+                Skip Docs
+              </button>
+            </div>
+          </div>
+
           {/* Split Desktop Layout: Left Document / Right Extracted Tabs */}
           <div style={{ display: 'grid', gridTemplateColumns: '42% 58%', gap: '16px', flex: 1, minHeight: '480px', overflow: 'hidden' }}>
             
@@ -1139,7 +1247,8 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                   { id: 'premium', label: '5. Premium' },
                   { id: 'nominee', label: '6. Nominee' },
                   { id: 'commission', label: '7. Commission' },
-                  { id: 'crm', label: '8. Additional / CRM' }
+                  { id: 'crm', label: '8. Additional / CRM' },
+                  { id: 'documents', label: `9. KYC Docs (${Object.values(policyDocsToUpload).filter(Boolean).length})` }
                 ] : [
                   { id: 'customer', label: 'Customer Info' },
                   { id: 'policy', label: 'Policy Details' },
@@ -1148,7 +1257,8 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                   ...(currentSubtypeSchema.entities.hasMembers ? [{ id: 'members', label: `Insured Lives (${insuredMembers.length})` }] : []),
                   { id: 'nominee', label: 'Nominee' },
                   { id: 'commission', label: 'Commission' },
-                  { id: 'crm', label: 'Additional / CRM' }
+                  { id: 'crm', label: 'Additional / CRM' },
+                  { id: 'documents', label: `KYC Docs (${Object.values(policyDocsToUpload).filter(Boolean).length})` }
                 ]).map(tab => (
                   <button
                     key={tab.id}
@@ -3151,22 +3261,204 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
                   </div>
                 )}
 
+                {/* 9. KYC & Supporting Policy Documents (Optional) */}
+                {activeTab === 'documents' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{
+                      padding: '12px 14px',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--color-border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <FileCheck size={16} style={{ color: 'var(--color-primary)' }} />
+                          <span>Supporting Policy & KYC Documents</span>
+                          <span style={{ fontSize: '10px', fontWeight: '700', backgroundColor: '#e2e8f0', color: '#475569', padding: '2px 8px', borderRadius: '12px' }}>
+                            OPTIONAL
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '11.5px', color: 'var(--color-text-muted)', marginTop: '3px' }}>
+                          These uploads are optional. You can confirm & create the policy without uploading any documents.
+                        </div>
+                      </div>
+                      {Object.values(policyDocsToUpload).some(Boolean) && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setPolicyDocsToUpload({ AADHAAR: null, PAN: null, RC: null, GST_CERTIFICATE: null })}
+                          style={{ fontSize: '11px', color: '#dc2626' }}
+                        >
+                          Clear All
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      {[
+                        { type: 'AADHAAR', title: 'Aadhaar Card', subtitle: 'Customer identity / address proof' },
+                        { type: 'PAN', title: 'PAN Card', subtitle: 'Tax identification / KYC card' },
+                        { type: 'RC', title: 'RC (Registration Certificate)', subtitle: 'Vehicle registration certificate' },
+                        { type: 'GST_CERTIFICATE', title: 'GST Certificate', subtitle: 'Commercial / corporate GST certificate' }
+                      ].map(doc => {
+                        const currentFile = policyDocsToUpload[doc.type];
+                        return (
+                          <div
+                            key={doc.type}
+                            style={{
+                              padding: '12px',
+                              borderRadius: 'var(--radius-sm)',
+                              border: currentFile ? '1.5px solid #22c55e' : '1px solid var(--color-border)',
+                              backgroundColor: currentFile ? '#f0fdf4' : 'var(--color-bg)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              gap: '10px'
+                            }}
+                          >
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                                <span style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--color-text-main)' }}>
+                                  {doc.title}
+                                </span>
+                                <span style={{ fontSize: '10.5px', fontWeight: '600', color: currentFile ? '#16a34a' : 'var(--color-text-muted)' }}>
+                                  {currentFile ? 'Attached' : 'Optional'}
+                                </span>
+                              </div>
+                              <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>
+                                {doc.subtitle}
+                              </p>
+                            </div>
+
+                            {currentFile ? (
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '7px 10px',
+                                backgroundColor: '#ffffff',
+                                borderRadius: '6px',
+                                border: '1px solid #bbf7d0'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                                  <CheckCircle2 size={15} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                  <div style={{ overflow: 'hidden' }}>
+                                    <div style={{ fontSize: '11.5px', fontWeight: '600', color: '#15803d', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {currentFile.name}
+                                    </div>
+                                    <div style={{ fontSize: '10px', color: '#64748b' }}>
+                                      {(currentFile.size / 1024).toFixed(1)} KB • Will upload on save
+                                    </div>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveDoc(doc.type)}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#ef4444',
+                                    cursor: 'pointer',
+                                    padding: '3px',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                  }}
+                                  title="Remove attached file"
+                                >
+                                  <XCircle size={15} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div>
+                                <label
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    padding: '8px 10px',
+                                    border: '1.5px dashed var(--color-border)',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '11.5px',
+                                    fontWeight: '600',
+                                    color: 'var(--color-primary)',
+                                    backgroundColor: '#ffffff'
+                                  }}
+                                >
+                                  <UploadCloud size={14} />
+                                  <span>Choose File (PDF, JPG, PNG)</span>
+                                  <input
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => handleSelectDoc(doc.type, e.target.files[0])}
+                                  />
+                                </label>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{
+                      padding: '10px 12px',
+                      backgroundColor: '#f1f5f9',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <span style={{ fontSize: '11.5px', color: '#64748b' }}>
+                        💡 You can confirm the policy right now without uploading any documents.
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: '11px' }}
+                        onClick={() => setActiveTab('policy')}
+                      >
+                        Return to Policy Form
+                      </button>
+                    </div>
+                  </div>
+                )}
+
               </div>
 
               {/* Review Action Footer */}
-              <div style={{ padding: '12px 16px', borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button className="btn btn-secondary btn-sm" onClick={handleClose}>
-                  Cancel
-                </button>
-                <button
-                  className="btn btn-primary btn-sm"
-                  disabled={isConfirming}
-                  onClick={handleConfirmAndSave}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'var(--color-accent)' }}
-                >
-                  <CheckCircle2 size={15} />
-                  <span>{isConfirming ? 'Creating Policy...' : 'Confirm & Create Policy'}</span>
-                </button>
+              <div style={{ padding: '12px 16px', borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {Object.values(policyDocsToUpload).some(Boolean) ? (
+                    <span style={{ color: '#15803d', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <CheckCircle2 size={14} />
+                      {Object.values(policyDocsToUpload).filter(Boolean).length} KYC document(s) attached
+                    </span>
+                  ) : (
+                    <span style={{ color: '#64748b' }}>
+                      No KYC documents attached (Optional — skip enabled)
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button className="btn btn-secondary btn-sm" onClick={handleClose}>
+                    Cancel
+                  </button>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    disabled={isConfirming}
+                    onClick={handleConfirmAndSave}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'var(--color-accent)' }}
+                  >
+                    <CheckCircle2 size={15} />
+                    <span>{isConfirming ? 'Creating Policy...' : 'Confirm & Create Policy'}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
