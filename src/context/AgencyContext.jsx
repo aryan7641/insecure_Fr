@@ -8,7 +8,12 @@ export const AgencyProvider = ({ children }) => {
   const [currentAgency, setCurrentAgency] = useState(() => {
     const saved = localStorage.getItem('insecure_agency');
     try {
-      return saved ? JSON.parse(saved) : null;
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (parsed && (parsed.id === 'agency-1' || parsed._id === 'agency-1')) {
+        localStorage.removeItem('insecure_agency');
+        return null;
+      }
+      return parsed;
     } catch (e) {
       return null;
     }
@@ -25,10 +30,11 @@ export const AgencyProvider = ({ children }) => {
         if (Array.isArray(list) && list.length > 0) {
           setAgencies(list);
           const savedAgencyId = localStorage.getItem('insecure_agency_id');
-          const matched = (savedAgencyId ? list.find(a => (a.id || a._id) === savedAgencyId) : null) || list[0];
+          const validSavedId = (savedAgencyId && savedAgencyId !== 'agency-1') ? savedAgencyId : null;
+          const matched = (validSavedId ? list.find(a => (a.id || a._id) === validSavedId) : null) || list[0];
           setCurrentAgency(matched);
           const rawId = matched.id || matched._id;
-          if (rawId) {
+          if (rawId && rawId !== 'agency-1') {
             localStorage.setItem('insecure_agency_id', rawId);
           }
         }
@@ -40,10 +46,10 @@ export const AgencyProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (currentAgency) {
+    if (currentAgency && currentAgency.id !== 'agency-1' && currentAgency._id !== 'agency-1') {
       localStorage.setItem('insecure_agency', JSON.stringify(currentAgency));
       const agencyId = currentAgency.id || currentAgency._id;
-      if (agencyId) {
+      if (agencyId && agencyId !== 'agency-1') {
         localStorage.setItem('insecure_agency_id', agencyId);
       }
     } else {

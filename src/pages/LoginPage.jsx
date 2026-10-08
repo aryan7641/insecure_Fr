@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Lock, Loader } from 'lucide-react';
@@ -10,6 +10,14 @@ export const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get('error');
+    if (err) {
+      setErrorMsg(decodeURIComponent(err));
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -145,38 +153,6 @@ export const LoginPage = () => {
           <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '8px' }} disabled={loading}>
             {loading ? <Loader size={16} className="animate-spin" /> : <Lock size={16} />} Sign In
           </button>
-
-          <div style={{ marginTop: '20px', borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
-            <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px', textAlign: 'center' }}>
-              Quick Demo Login Shortcuts:
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                style={{ flex: 1 }}
-                onClick={async () => {
-                  setEmail('admin@apexwealth.in');
-                  await login('admin@apexwealth.in', 'password123', 'Admin');
-                  navigate('/dashboard');
-                }}
-              >
-                Login Admin
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                style={{ flex: 1 }}
-                onClick={async () => {
-                  setEmail('priya@apexwealth.in');
-                  await login('priya@apexwealth.in', 'password123', 'Agent');
-                  navigate('/dashboard');
-                }}
-              >
-                Login Agent
-              </button>
-            </div>
-          </div>
         </form>
       </div>
     </div>

@@ -131,7 +131,11 @@ export const apiClient = {
 
 function getAuthHeaders() {
   const token = localStorage.getItem('insecure_token');
-  const agencyId = localStorage.getItem('insecure_agency_id');
+  let agencyId = localStorage.getItem('insecure_agency_id');
+  if (agencyId === 'agency-1') {
+    agencyId = null;
+    localStorage.removeItem('insecure_agency_id');
+  }
   const headers = {};
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -146,6 +150,7 @@ function handleUnauthorized() {
   const currentPath = window.location.pathname;
   if (currentPath !== '/login' && currentPath !== '/auth/callback') {
     localStorage.removeItem('insecure_token');
+    localStorage.removeItem('insecure_user');
     window.location.href = '/login';
   }
 }
