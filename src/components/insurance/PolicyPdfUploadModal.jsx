@@ -540,7 +540,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess, resumeDoc
         finalPremium: extPrem.finalPremium?.value || '',
         premium: extPrem.finalPremium?.value || '',
         premiumFrequency: extPrem.premiumFrequency?.value || 'yearly',
-        notes: AI-extracted policy via Docling / Subtype LLM Parser ()
+        notes: 'AI-extracted policy via Docling / Subtype LLM Parser'
       });
 
       if (extMot) {
