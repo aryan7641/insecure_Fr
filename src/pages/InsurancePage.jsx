@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Shield, Search, Filter, UploadCloud, MessageSquare, 
   RefreshCw, FileText, Loader, ExternalLink, AlertCircle, CheckCircle, ChevronRight, User,
-  FileCheck
+  FileCheck,
+  Edit3, Trash2, Clock
 } from 'lucide-react';
 import { PolicyStatusBadge } from '../components/insurance/PolicyStatusBadge';
 import { PolicyFormModal } from '../components/insurance/PolicyFormModal';
@@ -28,6 +29,12 @@ export const InsurancePage = () => {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [subtypeFilter, setSubtypeFilter] = useState('ALL');
   const [expiringFilter, setExpiringFilter] = useState('ALL');
+
+  // Drafts & Edit State
+  const [pendingDrafts, setPendingDrafts] = useState([]);
+  const [policyToEdit, setPolicyToEdit] = useState(null);
+  const [resumeDocId, setResumeDocId] = useState(null);
+  const [showDrafts, setShowDrafts] = useState(true);
 
   // Modals
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
@@ -54,17 +61,46 @@ export const InsurancePage = () => {
     }
   }, [agencyId]);
 
+  const fetchDrafts = useCallback(async () => {
+    if (!agencyId) return;
+    try {
+      const res = await apiClient.get(`/agencies/${agencyId}/ocr/drafts`);
+      const items = res?.data?.data || res?.data || [];
+      if (Array.isArray(items)) {
+        setPendingDrafts(items);
+      }
+    } catch (err) {
+      console.warn('Failed to load pending drafts:', err.message);
+    }
+  }, [agencyId]);
+
+  const handleDiscardDraft = async (docId, fileName) => {
+    if (!window.confirm(`Discard pending draft "${fileName}"? This cannot be undone.`)) return;
+    try {
+      await apiClient.delete(`/agencies/${agencyId}/ocr/drafts/${docId}`);
+      fetchDrafts();
+    } catch (err) {
+      console.error('Failed to discard draft:', err);
+    }
+  };
+
   useEffect(() => {
     fetchPolicies();
+    fetchDrafts();
 
-    const handleSync = () => fetchPolicies();
+    const handleSync = () => {
+      fetchPolicies();
+      fetchDrafts();
+    };
     window.addEventListener('policyCreated', handleSync);
+    window.addEventListener('policyUpdated', handleSync);
     window.addEventListener('customerCreated', handleSync);
     return () => {
       window.removeEventListener('policyCreated', handleSync);
+      window.removeEventListener('policyUpdated', handleSync);
       window.removeEventListener('customerCreated', handleSync);
     };
-  }, [fetchPolicies]);
+  }, [fetchPolicies, fetchDrafts]);
 
   // Filter policies based on role, search, status, type, subtype, and renewal window
   const displayedPolicies = policies.filter(p => {
@@ -140,10 +176,30 @@ export const InsurancePage = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
+          {pendingDrafts.length > 0 && (
+            <button 
+              className="btn btn-secondary btn-sm"
+              onClick={() => setShowDrafts(!showDrafts)}
+              title="Toggle Pending PDF Drafts"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: '#fffbeb',
+                color: '#b45309',
+                borderColor: '#fde68a',
+                fontWeight: '600'
+              }}
+            >
+              <AlertCircle size={14} />
+              <span>Pending Reviews ({pendingDrafts.length})</span>
+            </button>
+          )}
+
           <button 
             className="btn btn-secondary btn-sm"
-            onClick={fetchPolicies}
-            title="Refresh List"
+            onClick={() => { fetchPolicies(); fetchDrafts(); }}
+            title="Refresh List & Drafts"
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -174,6 +230,103 @@ export const InsurancePage = () => {
           </button>
         </div>
       </div>
+
+      {/* Pending Reviews Banner / Queue */}
+      {pendingDrafts.length > 0 && showDrafts && (
+        <div className="card" style={{
+          padding: '16px 20px',
+          borderLeft: '4px solid #f59e0b',
+          backgroundColor: '#fffdf5',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertCircle size={18} style={{ color: '#d97706' }} />
+              <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#92400e', margin: 0 }}>
+                {pendingDrafts.length} Policy {pendingDrafts.length === 1 ? 'Upload' : 'Uploads'} Awaiting Agent Review
+              </h3>
+              <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '9999px', backgroundColor: '#fef3c7', color: '#b45309', fontWeight: '700' }}>
+                Action Required
+              </span>
+            </div>
+            <button 
+              className="btn btn-secondary btn-sm"
+              onClick={() => setShowDrafts(false)}
+              style={{ fontSize: '11px', padding: '2px 8px' }}
+            >
+              Hide Drafts
+            </button>
+          </div>
+          <p style={{ fontSize: '12.5px', color: '#78350f', margin: 0 }}>
+            These policies were uploaded via PDF (AI OCR). Review and verify extracted details before finalizing them into the active portfolio.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+            {pendingDrafts.map(draft => (
+              <div key={draft.id || draft.documentId} style={{
+                border: '1px solid #fde68a',
+                borderRadius: '8px',
+                padding: '12px 14px',
+                backgroundColor: '#ffffff',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '10px'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--color-text-main)' }}>
+                      {draft.fileName}
+                    </div>
+                    <span className="badge badge-warning" style={{ fontSize: '9.5px' }}>
+                      Pending Review
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                    <strong>Policy #:</strong> {draft.policyNumber} • <strong>Insurer:</strong> {draft.insurer}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                    <strong>Client:</strong> {draft.customerName} {draft.customerMobile ? `(${draft.customerMobile})` : ''}
+                  </div>
+                  {draft.premium > 0 && (
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                      <strong>Premium:</strong> {formatINR(draft.premium)}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #fef3c7' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>
+                    {draft.createdAt ? formatDate(draft.createdAt) : 'Recently'}
+                  </span>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      title="Discard Draft"
+                      onClick={() => handleDiscardDraft(draft.documentId, draft.fileName)}
+                      style={{ padding: '4px 8px', color: '#dc2626' }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      title="Review & Finalize Policy"
+                      onClick={() => {
+                        setResumeDocId(draft.documentId);
+                        setIsPdfModalOpen(true);
+                      }}
+                      style={{ padding: '4px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#d97706' }}
+                    >
+                      <FileCheck size={13} />
+                      <span>Review & Confirm</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filter Toolbar */}
       <div className="card" style={{ padding: '12px 16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -469,6 +622,16 @@ export const InsurancePage = () => {
 
                           <button
                             className="btn btn-secondary btn-sm"
+                            title="Review and Edit Policy Details"
+                            onClick={() => setPolicyToEdit(p)}
+                            style={{ padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '600', color: 'var(--color-accent)' }}
+                          >
+                            <Edit3 size={13} />
+                            <span>Review / Edit</span>
+                          </button>
+
+                          <button
+                            className="btn btn-secondary btn-sm"
                             title="Manage Policy KYC Documents (Aadhaar, PAN, RC, GST Certificate)"
                             onClick={() => setSelectedPolicyForDocs(p)}
                             style={{ padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px' }}
@@ -490,15 +653,35 @@ export const InsurancePage = () => {
       {/* Modals */}
       <PolicyPdfUploadModal
         isOpen={isPdfModalOpen}
-        onClose={() => setIsPdfModalOpen(false)}
-        onSaveSuccess={() => fetchPolicies()}
+        resumeDocId={resumeDocId}
+        onClose={() => {
+          setIsPdfModalOpen(false);
+          setResumeDocId(null);
+        }}
+        onSaveSuccess={() => {
+          setIsPdfModalOpen(false);
+          setResumeDocId(null);
+          fetchPolicies();
+          fetchDrafts();
+        }}
       />
 
-      <PolicyFormModal
-        isOpen={isManualModalOpen}
-        onClose={() => setIsManualModalOpen(false)}
-        onSaveSuccess={() => fetchPolicies()}
-      />
+      {(isManualModalOpen || !!policyToEdit) && (
+        <PolicyFormModal
+          isOpen={isManualModalOpen || !!policyToEdit}
+          policy={policyToEdit}
+          onClose={() => {
+            setIsManualModalOpen(false);
+            setPolicyToEdit(null);
+          }}
+          onSaveSuccess={() => {
+            setIsManualModalOpen(false);
+            setPolicyToEdit(null);
+            fetchPolicies();
+            fetchDrafts();
+          }}
+        />
+      )}
 
       {whatsappCustomer && (
         <WhatsappPreviewModal

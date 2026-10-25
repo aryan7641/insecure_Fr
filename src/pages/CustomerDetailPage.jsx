@@ -3,7 +3,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   User, Phone, Mail, MapPin, Calendar, CreditCard, Shield, 
   FileText, CalendarCheck, MessageSquare, Activity, DollarSign, Plus, Eye, Loader, UploadCloud, RefreshCw,
-  ArrowLeft, ChevronRight, CheckCircle2, AlertTriangle, ExternalLink, Percent, FileCheck
+  ArrowLeft, ChevronRight, CheckCircle2, AlertTriangle, ExternalLink, Percent, FileCheck, Edit3
 } from 'lucide-react';
 import { Tabs } from '../components/common/Tabs';
 import { PolicyStatusBadge } from '../components/insurance/PolicyStatusBadge';
@@ -38,6 +38,7 @@ export const CustomerDetailPage = () => {
   const [whatsappModal, setWhatsappModal] = useState(false);
   const [selectedPolicyForWhatsapp, setSelectedPolicyForWhatsapp] = useState(null);
   const [commissionPolicyTarget, setCommissionPolicyTarget] = useState(null);
+  const [policyToEdit, setPolicyToEdit] = useState(null);
   const [selectedPolicyForDocs, setSelectedPolicyForDocs] = useState(null);
 
   const agencyId = currentAgency?.id || currentAgency?._id || localStorage.getItem('insecure_agency_id');
@@ -584,6 +585,16 @@ export const CustomerDetailPage = () => {
                             )}
                             <button
                               className="btn btn-secondary btn-sm"
+                              title="Review and Edit Policy Details"
+                              onClick={() => setPolicyToEdit(p)}
+                              style={{ padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', fontWeight: '600', color: 'var(--color-accent)' }}
+                            >
+                              <Edit3 size={13} />
+                              <span>Review / Edit</span>
+                            </button>
+
+                            <button
+                              className="btn btn-secondary btn-sm"
                               title="Manage Policy KYC Documents (Aadhaar, PAN, RC, GST Certificate)"
                               onClick={() => setSelectedPolicyForDocs(p)}
                               style={{ padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px' }}
@@ -731,12 +742,22 @@ export const CustomerDetailPage = () => {
         onSaveSuccess={() => loadData()}
       />
 
-      <PolicyFormModal
-        isOpen={isManualPolicyModalOpen}
-        onClose={() => setIsManualPolicyModalOpen(false)}
-        customerId={id}
-        onSaveSuccess={() => loadData()}
-      />
+      {(isManualPolicyModalOpen || !!policyToEdit) && (
+        <PolicyFormModal
+          isOpen={isManualPolicyModalOpen || !!policyToEdit}
+          policy={policyToEdit}
+          onClose={() => {
+            setIsManualPolicyModalOpen(false);
+            setPolicyToEdit(null);
+          }}
+          customerId={id}
+          onSaveSuccess={() => {
+            setIsManualPolicyModalOpen(false);
+            setPolicyToEdit(null);
+            loadData();
+          }}
+        />
+      )}
 
       {whatsappModal && (
         <WhatsappPreviewModal

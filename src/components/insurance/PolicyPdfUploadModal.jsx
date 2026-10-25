@@ -13,7 +13,7 @@ import { INSURANCE_TAXONOMY, getSubtypeConfig } from '../../schemas/insuranceTax
 import { SUBTYPE_SCHEMAS, getSubtypeSchema } from '../../schemas/insuranceSubtypeSchemas';
 import { formatINR } from '../../utils/formatters';
 
-export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
+export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess, resumeDocId = null }) => {
   const { addToast } = useToast();
   const { currentAgency } = useAgency();
   const fileInputRef = useRef(null);
@@ -25,6 +25,28 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
+
+  // Resume / Load existing draft document
+  useEffect(() => {
+    if (isOpen && resumeDocId && agencyId) {
+      const loadResumeDoc = async () => {
+        setIsProcessing(true);
+        setStep('extracting');
+        try {
+          const res = await apiClient.get(`/agencies/${agencyId}/ocr/${resumeDocId}/result`);
+          const data = res.data?.data || res.data;
+          applyExtractionResult(data);
+        } catch (err) {
+          console.error('Failed to load pending draft:', err);
+          addToast(err.response?.data?.message || err.message || 'Failed to load policy draft', 'danger');
+          setStep('select_or_upload');
+        } finally {
+          setIsProcessing(false);
+        }
+      };
+      loadResumeDoc();
+    }
+  }, [isOpen, resumeDocId, agencyId]);
   
   // Classification & Review State
   const [classification, setClassification] = useState(null);
@@ -380,7 +402,18 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
 
       const res = await apiClient.post(`/agencies/${agencyId}/ocr/extract-pdf`, formData);
       const data = res.data?.data || res.data || res;
-      
+      applyExtractionResult(data);
+    } catch (err) {
+      console.error('OCR Extraction error:', err);
+      addToast(err.message || 'Failed to extract policy data from PDF', 'danger');
+      setStep('select_or_upload');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const applyExtractionResult = (data) => {
+    try {
       const newDocId = data.documentId;
       setDocumentId(newDocId);
       setBlobUrl(data.blobUrl || null);
@@ -458,53 +491,25 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
         recordStatus('motor.model', extMot.model);
         recordStatus('motor.variant', extMot.variant);
         recordStatus('motor.fuelType', extMot.fuelType);
-        recordStatus('motor.cubicCapacity', extMot.cubicCapacity);
-        recordStatus('motor.seatingCapacity', extMot.seatingCapacity);
         recordStatus('motor.engineNumber', extMot.engineNumber);
         recordStatus('motor.chassisNumber', extMot.chassisNumber);
+        recordStatus('motor.manufacturingYear', extMot.manufacturingYear);
         recordStatus('motor.idv', extMot.idv);
         recordStatus('motor.ncb', extMot.ncb);
         recordStatus('motor.ownDamagePremium', extMot.ownDamagePremium);
         recordStatus('motor.thirdPartyPremium', extMot.thirdPartyPremium);
-        recordStatus('motor.previousInsurer', extMot.previousInsurer);
-        recordStatus('motor.previousPolicyNumber', extMot.previousPolicyNumber);
-        recordStatus('motor.financierName', extMot.financierName);
       }
 
       setFieldStatuses(statuses);
 
-      // Deterministic Title-to-Gender derivation
-      const rawGender = (extCust.gender?.value || '').toLowerCase().trim();
-      const rawTitle = (extCust.title?.value || '').trim();
-      const rawName = (extCust.name?.value || '').trim();
-
-      let extractedGender = '';
-      const cleanT = rawTitle.toLowerCase().replace(/\./g, '').trim();
-      if (['mr', 'shri', 'master', 'mister'].includes(cleanT)) {
-        extractedGender = 'male';
-      } else if (['mrs', 'ms', 'miss', 'smt', 'kumari'].includes(cleanT)) {
-        extractedGender = 'female';
-      } else {
-        const nameMatch = rawName.match(/^(mr|mrs|ms|miss|shri|smt|master)\b\.?\s*/i);
-        if (nameMatch) {
-          const prefix = nameMatch[1].toLowerCase();
-          if (['mr', 'shri', 'master'].includes(prefix)) extractedGender = 'male';
-          else if (['mrs', 'ms', 'miss', 'smt'].includes(prefix)) extractedGender = 'female';
-        } else if (rawGender) {
-          if (rawGender.startsWith('m')) extractedGender = 'male';
-          else if (rawGender.startsWith('f')) extractedGender = 'female';
-          else if (rawGender === 'other') extractedGender = 'other';
-        }
-      }
-
-      // Populate draft customer form state
+      // Populate form fields with extracted data
       setCustomerData({
-        title: rawTitle || (extractedGender === 'male' ? 'Mr.' : (extractedGender === 'female' ? 'Mrs.' : 'Mr.')),
-        name: rawName,
-        mobile: extCust.mobile?.value || '',
+        title: extCust.title?.value || '',
+        name: extCust.name?.value || '',
+        mobile: extCust.mobile?.value ? String(extCust.mobile.value).replace(/\D/g, '').slice(-10) : '',
         email: extCust.email?.value || '',
         dob: extCust.dob?.value ? extCust.dob.value.slice(0, 10) : '',
-        gender: extractedGender || 'male',
+        gender: extCust.gender?.value || '',
         pan: extCust.pan?.value || '',
         aadhaar: extCust.aadhaar?.value || '',
         address: extCust.address?.value || '',
@@ -512,12 +517,11 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
         district: extCust.district?.value || '',
         state: extCust.state?.value || '',
         pincode: extCust.pincode?.value || '',
-        customerType: extCust.customerType?.value || 'individual'
+        customerType: 'individual'
       });
 
-      // Populate draft policy form state
       setPolicyData({
-        insurer: extPol.insurer?.value || '',
+        insurer: extPol.insurer?.value || extPol.insuranceCompany?.value || '',
         productName: extPol.productName?.value || '',
         planName: extPol.planName?.value || '',
         policyNumber: extPol.policyNumber?.value || '',
@@ -528,100 +532,48 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
         issueDate: extPol.issueDate?.value ? extPol.issueDate.value.slice(0, 10) : '',
         startDate: extPol.startDate?.value ? extPol.startDate.value.slice(0, 10) : '',
         endDate: extPol.endDate?.value ? extPol.endDate.value.slice(0, 10) : '',
-        renewalDate: extPol.renewalDate?.value ? extPol.renewalDate.value.slice(0, 10) : '',
-        tenureYears: extPol.tenureYears?.value ? String(extPol.tenureYears.value) : '1',
+        renewalDate: extPol.renewalDate?.value ? extPol.renewalDate.value.slice(0, 10) : (extPol.endDate?.value ? extPol.endDate.value.slice(0, 10) : ''),
+        premiumDueDate: extPol.premiumDueDate?.value ? extPol.premiumDueDate.value.slice(0, 10) : '',
         sumAssured: extPol.sumAssured?.value || '',
         basicPremium: extPrem.basicPremium?.value || '',
         gst: extPrem.gst?.value || '',
-        gstPercentage: extPrem.gstPercentage?.value || '18',
-        cess: extPrem.cess?.value || '',
-        discount: extPrem.discount?.value || '',
-        loading: extPrem.loading?.value || '',
         finalPremium: extPrem.finalPremium?.value || '',
-        installmentAmount: extPrem.installmentAmount?.value || '',
-        premiumFrequency: 'yearly',
-        notes: ''
+        premium: extPrem.finalPremium?.value || '',
+        premiumFrequency: extPrem.premiumFrequency?.value || 'yearly',
+        notes: AI-extracted policy via Docling / Subtype LLM Parser ()
       });
 
-      // Populate draft motor form state
       if (extMot) {
         setMotorData({
+          registrationNumber: extMot.registrationNumber?.value || '',
           vehicleType: extMot.vehicleType?.value || 'Private Car',
-          vehicleCategory: extMot.vehicleCategory?.value || 'Private Car',
           make: extMot.make?.value || '',
           model: extMot.model?.value || '',
           variant: extMot.variant?.value || '',
-          subModel: extMot.subModel?.value || '',
+          idv: extMot.idv?.value || '',
+          ncbPercentage: extMot.ncb?.value !== undefined ? String(extMot.ncb.value) : '0',
           fuelType: extMot.fuelType?.value || 'Petrol',
-          cubicCapacity: extMot.cubicCapacity?.value || '',
-          seatingCapacity: extMot.seatingCapacity?.value || '',
-          numberOfTyres: extMot.numberOfTyres?.value || '',
-          vehicleColor: extMot.vehicleColor?.value || '',
-          registrationNumber: extMot.registrationNumber?.value || '',
-          registrationDate: extMot.registrationDate?.value ? extMot.registrationDate.value.slice(0, 10) : '',
-          registrationState: extMot.registrationState?.value || '',
-          registrationCity: extMot.registrationCity?.value || '',
-          rtoCode: extMot.rtoCode?.value || '',
-          rtoName: extMot.rtoName?.value || '',
-          zone: extMot.zone?.value || '',
-          manufacturingMonth: extMot.manufacturingMonth?.value || '',
-          manufacturingYear: extMot.manufacturingYear?.value || '',
-          manufacturingDate: extMot.manufacturingDate?.value ? extMot.manufacturingDate.value.slice(0, 10) : '',
           engineNumber: extMot.engineNumber?.value || '',
           chassisNumber: extMot.chassisNumber?.value || '',
-          vinNumber: extMot.vinNumber?.value || '',
-          identificationNumber: extMot.identificationNumber?.value || '',
-          idv: extMot.idv?.value || '',
-          vehicleValue: extMot.vehicleValue?.value || '',
-          currentNcbPercentage: extMot.currentNcbPercentage?.value !== undefined && extMot.currentNcbPercentage?.value !== null ? String(extMot.currentNcbPercentage.value) : '',
-          previousNcbPercentage: extMot.previousNcbPercentage?.value !== undefined && extMot.previousNcbPercentage?.value !== null ? String(extMot.previousNcbPercentage.value) : '',
-          ncbPercentage: extMot.ncb?.value !== undefined && extMot.ncb?.value !== null ? String(extMot.ncb.value) : '0',
-          previousPolicyAvailable: extMot.previousPolicyAvailable?.value !== undefined ? extMot.previousPolicyAvailable.value : null,
+          manufacturingYear: extMot.manufacturingYear?.value || '',
+          registrationDate: extMot.registrationDate?.value ? extMot.registrationDate.value.slice(0, 10) : '',
           previousInsurer: extMot.previousInsurer?.value || '',
           previousPolicyNumber: extMot.previousPolicyNumber?.value || '',
-          previousPolicyStartDate: extMot.previousPolicyStartDate?.value ? extMot.previousPolicyStartDate.value.slice(0, 10) : '',
-          previousPolicyEndDate: extMot.previousPolicyEndDate?.value ? extMot.previousPolicyEndDate.value.slice(0, 10) : '',
-          previousPolicyType: extMot.previousPolicyType?.value || '',
-          previousNcb: extMot.previousNcb?.value || '',
-          previousIdv: extMot.previousIdv?.value || '',
-          activeTpInsurerName: extMot.activeTpInsurerName?.value || '',
-          activeTpPolicyNumber: extMot.activeTpPolicyNumber?.value || '',
-          activeTpPolicyStartDate: extMot.activeTpPolicyStartDate?.value ? extMot.activeTpPolicyStartDate.value.slice(0, 10) : '',
-          activeTpPolicyEndDate: extMot.activeTpPolicyEndDate?.value ? extMot.activeTpPolicyEndDate.value.slice(0, 10) : '',
-          tpPremium: extMot.tpPremium?.value || '',
-          financed: extMot.financed?.value !== undefined ? extMot.financed.value : null,
-          financierName: extMot.financierName?.value || '',
-          hypothecation: extMot.hypothecation?.value || '',
-          loanProvider: extMot.loanProvider?.value || '',
-          addons: extMot.addons || [],
-          zeroDepreciation: !!extMot.zeroDepreciation?.value,
-          engineProtection: !!extMot.engineProtection?.value,
-          roadsideAssistance: !!extMot.roadsideAssistance?.value,
-          consumables: !!extMot.consumables?.value,
-          returnToInvoice: !!extMot.returnToInvoice?.value,
-          ncbProtector: !!extMot.ncbProtector?.value,
-          tyreProtector: !!extMot.tyreProtector?.value,
-          keyReplacement: !!extMot.keyReplacement?.value,
-          personalBelongings: !!extMot.personalBelongings?.value,
-          personalAccidentCover: !!extMot.personalAccidentCover?.value,
           ownDamagePremium: extMot.ownDamagePremium?.value || '',
           thirdPartyPremium: extMot.thirdPartyPremium?.value || '',
-          personalAccidentPremium: extMot.personalAccidentPremium?.value || '',
-          addonPremium: extMot.addonPremium?.value || '',
-          discount: extPrem.discount?.value || '',
-          loading: extPrem.loading?.value || '',
-          cess: extPrem.cess?.value || ''
+          zeroDepreciation: Boolean(extMot.zeroDepreciation?.value),
+          engineProtection: Boolean(extMot.engineProtection?.value),
+          roadsideAssistance: Boolean(extMot.roadsideAssistance?.value),
+          consumables: Boolean(extMot.consumables?.value)
         });
       }
 
-      // Populate draft broker & payment state
       if (extBroker) {
         setBrokerData({
-          brokerAgency: extBroker.brokerAgency?.value || '',
-          agentName: extBroker.agentName?.value || '',
-          subAgent: extBroker.subAgent?.value || '',
+          brokerName: extBroker.brokerName?.value || '',
           brokerCode: extBroker.brokerCode?.value || '',
-          agentCode: extBroker.agentCode?.value || ''
+          branch: extBroker.branch?.value || '',
+          relationshipManager: extBroker.relationshipManager?.value || ''
         });
       }
 
@@ -850,7 +802,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess }) => {
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Upload Insurance Policy PDF (AI OCR & Extraction)"
+      title={resumeDocId ? "Review Policy Extraction Draft (AI OCR)" : "Upload Insurance Policy PDF (AI OCR & Extraction)"}
       maxWidth={step === 'review' ? '1280px' : '640px'}
     >
       {/* ------------------------------------------------------------- */}

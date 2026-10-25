@@ -10,7 +10,7 @@ import { apiClient } from '../../api/client';
 import { INSURANCE_TAXONOMY, getSubtypeConfig } from '../../schemas/insuranceTaxonomy';
 import { getSubtypeSchema } from '../../schemas/insuranceSubtypeSchemas';
 
-export const PolicyFormModal = ({ isOpen, onClose, customerId, onSaveSuccess }) => {
+export const PolicyFormModal = ({ isOpen, onClose, customerId, policy = null, onSaveSuccess }) => {
   const { addToast } = useToast();
   const { currentAgency } = useAgency();
 
@@ -126,6 +126,141 @@ export const PolicyFormModal = ({ isOpen, onClose, customerId, onSaveSuccess }) 
     share: 100
   });
 
+  const isEdit = Boolean(policy && (policy._id || policy.id));
+  const policyToEditId = policy?._id || policy?.id;
+
+  // Prefill state when reviewing/editing an existing policy
+  useEffect(() => {
+    if (isOpen && isEdit && policy) {
+      const polType = policy.insuranceType || policy.lob?.toLowerCase() || policy.policyType || 'health';
+      setSelectedType(polType);
+      setSelectedSubtype(policy.insuranceSubtype || (polType === 'motor' ? 'car' : 'individual_health'));
+      
+      const cId = policy.customerId?._id || policy.customerId?.id || policy.customerId || customerId || '';
+      if (cId) setSelectedCustomerId(cId);
+
+      setPolicyData({
+        policyNumber: policy.policyNumber || '',
+        insuranceCompany: policy.insuranceCompany || policy.insurerName || 'HDFC ERGO General Insurance',
+        productName: policy.productName || policy.planName || '',
+        planName: policy.planName || '',
+        businessType: policy.businessType || 'new',
+        status: policy.status || 'active',
+        startDate: policy.startDate ? policy.startDate.slice(0, 10) : '',
+        endDate: policy.endDate ? policy.endDate.slice(0, 10) : '',
+        renewalDate: policy.renewalDate ? policy.renewalDate.slice(0, 10) : '',
+        notes: policy.notes || ''
+      });
+
+      setPremiumData({
+        sumAssured: policy.sumAssured !== undefined && policy.sumAssured !== null ? String(policy.sumAssured) : '',
+        basicPremium: policy.basicPremium !== undefined && policy.basicPremium !== null ? String(policy.basicPremium) : '',
+        gst: policy.gst !== undefined && policy.gst !== null ? String(policy.gst) : '',
+        finalPremium: (policy.finalPremium ?? policy.premium ?? policy.premiumAmount ?? '') !== '' ? String(policy.finalPremium ?? policy.premium ?? policy.premiumAmount) : '',
+        premiumFrequency: policy.premiumFrequency || 'yearly'
+      });
+
+      if (policy.healthDetails) {
+        setHealthDetails({
+          roomRentLimit: policy.healthDetails.roomRentLimit || '',
+          icuLimit: policy.healthDetails.icuLimit || '',
+          coPayment: policy.healthDetails.coPayment || '',
+          deductible: policy.healthDetails.deductible !== undefined && policy.healthDetails.deductible !== null ? String(policy.healthDetails.deductible) : '',
+          aggregateDeductible: policy.healthDetails.aggregateDeductible !== undefined && policy.healthDetails.aggregateDeductible !== null ? String(policy.healthDetails.aggregateDeductible) : '',
+          preExistingWaitingPeriod: policy.healthDetails.preExistingWaitingPeriod || '',
+          cumulativeBonus: policy.healthDetails.cumulativeBonus || '',
+          restorationBenefit: policy.healthDetails.restorationBenefit || ''
+        });
+      }
+
+      const veh = policy.vehicleDetails || policy.motorData || {};
+      if (veh && (veh.registrationNumber || veh.make)) {
+        setMotorData({
+          registrationNumber: veh.registrationNumber || '',
+          vehicleType: veh.vehicleType || 'Private Car',
+          make: veh.make || '',
+          model: veh.model || '',
+          variant: veh.variant || '',
+          idv: veh.idv !== undefined && veh.idv !== null ? String(veh.idv) : '',
+          ncbPercentage: veh.ncbPercentage !== undefined && veh.ncbPercentage !== null ? String(veh.ncbPercentage) : (veh.ncb !== undefined ? String(veh.ncb) : '0'),
+          fuelType: veh.fuelType || 'Petrol',
+          engineNumber: veh.engineNumber || '',
+          chassisNumber: veh.chassisNumber || '',
+          manufacturingYear: veh.manufacturingYear !== undefined && veh.manufacturingYear !== null ? String(veh.manufacturingYear) : '',
+          registrationDate: veh.registrationDate ? veh.registrationDate.slice(0, 10) : '',
+          previousInsurer: veh.previousInsurer || '',
+          previousPolicyNumber: veh.previousPolicyNumber || '',
+          ownDamagePremium: veh.ownDamagePremium !== undefined && veh.ownDamagePremium !== null ? String(veh.ownDamagePremium) : '',
+          thirdPartyPremium: veh.thirdPartyPremium !== undefined && veh.thirdPartyPremium !== null ? String(veh.thirdPartyPremium) : '',
+          zeroDepreciation: Boolean(veh.zeroDepreciation),
+          engineProtection: Boolean(veh.engineProtection),
+          roadsideAssistance: Boolean(veh.roadsideAssistance),
+          consumables: Boolean(veh.consumables)
+        });
+      }
+
+      if (policy.lifeDetails) {
+        setLifeDetails({
+          uin: policy.lifeDetails.uin || '',
+          policyTermYears: policy.lifeDetails.policyTermYears !== undefined && policy.lifeDetails.policyTermYears !== null ? String(policy.lifeDetails.policyTermYears) : '',
+          premiumPaymentTermYears: policy.lifeDetails.premiumPaymentTermYears !== undefined && policy.lifeDetails.premiumPaymentTermYears !== null ? String(policy.lifeDetails.premiumPaymentTermYears) : '',
+          deathBenefit: policy.lifeDetails.deathBenefit || '',
+          maturityDate: policy.lifeDetails.maturityDate ? policy.lifeDetails.maturityDate.slice(0, 10) : '',
+          maturityBenefit: policy.lifeDetails.maturityBenefit || '',
+          smokerStatus: policy.lifeDetails.smokerStatus || 'non_smoker',
+          accidentalDeathRider: policy.lifeDetails.accidentalDeathRider !== undefined && policy.lifeDetails.accidentalDeathRider !== null ? String(policy.lifeDetails.accidentalDeathRider) : '',
+          criticalIllnessRider: policy.lifeDetails.criticalIllnessRider !== undefined && policy.lifeDetails.criticalIllnessRider !== null ? String(policy.lifeDetails.criticalIllnessRider) : '',
+          fundName: policy.lifeDetails.fundName || '',
+          unitsHeld: policy.lifeDetails.unitsHeld !== undefined && policy.lifeDetails.unitsHeld !== null ? String(policy.lifeDetails.unitsHeld) : '',
+          nav: policy.lifeDetails.nav !== undefined && policy.lifeDetails.nav !== null ? String(policy.lifeDetails.nav) : '',
+          totalFundValue: policy.lifeDetails.totalFundValue !== undefined && policy.lifeDetails.totalFundValue !== null ? String(policy.lifeDetails.totalFundValue) : '',
+          annuityAmount: policy.lifeDetails.annuityAmount !== undefined && policy.lifeDetails.annuityAmount !== null ? String(policy.lifeDetails.annuityAmount) : ''
+        });
+      }
+
+      if (policy.nominee) {
+        setNomineeData({
+          name: policy.nominee.name || '',
+          relation: policy.nominee.relation || 'Spouse',
+          dob: policy.nominee.dob ? policy.nominee.dob.slice(0, 10) : '',
+          share: policy.nominee.share ?? 100
+        });
+      }
+
+      if (Array.isArray(policy.insuredMembers) && policy.insuredMembers.length > 0) {
+        setInsuredMembers(policy.insuredMembers);
+      }
+
+      if (policy.commission) {
+        setCommissionData({
+          commissionType: policy.commission.commissionType || policy.commission.type || 'percentage',
+          commissionBasis: policy.commission.commissionBasis || policy.commission.basis || 'net_premium',
+          commissionPercentage: policy.commission.commissionPercentage ?? policy.commission.percentage ?? '',
+          commissionAmount: policy.commission.commissionAmount ?? policy.commission.amount ?? '',
+          flatAmount: policy.commission.flatAmount ?? '',
+          commissionStatus: policy.commission.commissionStatus || policy.commission.status || 'pending',
+          remarks: policy.commission.remarks || ''
+        });
+      } else if (agencyId && policyToEditId) {
+        apiClient.get(`/agencies/${agencyId}/insurance-policies/${policyToEditId}/commission`)
+          .then(res => {
+            const comm = res.data?.commission || res.data?.data || res.data;
+            if (comm && comm._id) {
+              setCommissionData({
+                commissionType: comm.commissionType || 'percentage',
+                commissionBasis: comm.commissionBasis || 'net_premium',
+                commissionPercentage: comm.commissionPercentage ?? '',
+                commissionAmount: comm.commissionAmount ?? '',
+                flatAmount: comm.flatAmount ?? '',
+                commissionStatus: comm.commissionStatus || 'pending',
+                remarks: comm.remarks || ''
+              });
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [isOpen, isEdit, policy, agencyId, policyToEditId, customerId]);
   const [commissionData, setCommissionData] = useState({
     commissionType: 'percentage',
     commissionBasis: 'net_premium',
@@ -327,30 +462,57 @@ export const PolicyFormModal = ({ isOpen, onClose, customerId, onSaveSuccess }) 
         insuredMembers: insuredMembers.filter(m => m.name.trim() !== '')
       };
 
-      const res = await apiClient.post(`/agencies/${agencyId}/insurance-policies`, payload);
-      const created = res.data || res;
-      const createdPolicyId = created.id || created._id;
+      if (isEdit) {
+        const res = await apiClient.put(`/agencies/${agencyId}/insurance-policies/${policyToEditId}`, payload);
+        const updated = res.data?.policy || res.data?.data || res.data || res;
 
-      if (createdPolicyId && (Number(commissionData.commissionPercentage) > 0 || Number(commissionData.commissionAmount) > 0 || Number(commissionData.flatAmount) > 0)) {
-        try {
-          await apiClient.post(`/agencies/${agencyId}/insurance-policies/${createdPolicyId}/commission`, {
-            commissionType: commissionData.commissionType,
-            commissionBasis: commissionData.commissionBasis,
-            commissionPercentage: Number(commissionData.commissionPercentage) || 0,
-            commissionAmount: getComputedCommissionAmount(),
-            flatAmount: Number(commissionData.flatAmount) || 0,
-            commissionStatus: commissionData.commissionStatus,
-            remarks: commissionData.remarks
-          });
-        } catch (commErr) {
-          console.warn('Initial commission save failed:', commErr);
+        if (Number(commissionData.commissionPercentage) > 0 || Number(commissionData.commissionAmount) > 0 || Number(commissionData.flatAmount) > 0) {
+          try {
+            await apiClient.put(`/agencies/${agencyId}/insurance-policies/${policyToEditId}/commission`, {
+              commissionType: commissionData.commissionType,
+              commissionBasis: commissionData.commissionBasis,
+              commissionPercentage: Number(commissionData.commissionPercentage) || 0,
+              commissionAmount: getComputedCommissionAmount(),
+              flatAmount: Number(commissionData.flatAmount) || 0,
+              commissionStatus: commissionData.commissionStatus,
+              remarks: commissionData.remarks
+            });
+          } catch (commErr) {
+            console.warn('Commission update failed:', commErr);
+          }
         }
-      }
 
-      addToast(`Policy #${policyData.policyNumber} created successfully!`, 'success');
-      window.dispatchEvent(new CustomEvent('policyCreated', { detail: created }));
-      if (onSaveSuccess) onSaveSuccess(created);
-      onClose();
+        addToast(`Policy #${policyData.policyNumber} updated successfully!`, 'success');
+        window.dispatchEvent(new CustomEvent('policyUpdated', { detail: updated }));
+        window.dispatchEvent(new CustomEvent('policyCreated', { detail: updated }));
+        if (onSaveSuccess) onSaveSuccess(updated);
+        onClose();
+      } else {
+        const res = await apiClient.post(`/agencies/${agencyId}/insurance-policies`, payload);
+        const created = res.data || res;
+        const createdPolicyId = created.id || created._id;
+
+        if (createdPolicyId && (Number(commissionData.commissionPercentage) > 0 || Number(commissionData.commissionAmount) > 0 || Number(commissionData.flatAmount) > 0)) {
+          try {
+            await apiClient.post(`/agencies/${agencyId}/insurance-policies/${createdPolicyId}/commission`, {
+              commissionType: commissionData.commissionType,
+              commissionBasis: commissionData.commissionBasis,
+              commissionPercentage: Number(commissionData.commissionPercentage) || 0,
+              commissionAmount: getComputedCommissionAmount(),
+              flatAmount: Number(commissionData.flatAmount) || 0,
+              commissionStatus: commissionData.commissionStatus,
+              remarks: commissionData.remarks
+            });
+          } catch (commErr) {
+            console.warn('Initial commission save failed:', commErr);
+          }
+        }
+
+        addToast(`Policy #${policyData.policyNumber} created successfully!`, 'success');
+        window.dispatchEvent(new CustomEvent('policyCreated', { detail: created }));
+        if (onSaveSuccess) onSaveSuccess(created);
+        onClose();
+      }
     } catch (err) {
       console.error('Save policy error:', err);
       addToast(err.message || 'Failed to create policy', 'danger');
@@ -362,7 +524,7 @@ export const PolicyFormModal = ({ isOpen, onClose, customerId, onSaveSuccess }) 
   const subtypeConfig = getSubtypeConfig(selectedSubtype);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Manual Policy Creation (Schema-Driven)" maxWidth="920px">
+    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? `Review & Edit Policy: ${policyData.policyNumber || "Details"}` : "Manual Policy Creation (Schema-Driven)"} maxWidth="920px">
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
         {/* Type & Subtype Header Banner */}
@@ -1351,10 +1513,10 @@ export const PolicyFormModal = ({ isOpen, onClose, customerId, onSaveSuccess }) 
           <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
-                <Loader size={16} className="animate-spin" style={{ marginRight: '6px' }} /> Saving Policy...
+                <Loader size={16} className="animate-spin" style={{ marginRight: '6px' }} /> {isEdit ? 'Updating Policy...' : 'Saving Policy...'}
               </>
             ) : (
-              'Save & Create Policy'
+              isEdit ? 'Save Changes' : 'Save & Create Policy'
             )}
           </button>
         </div>
