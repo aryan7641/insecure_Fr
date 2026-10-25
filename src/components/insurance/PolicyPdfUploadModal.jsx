@@ -683,17 +683,17 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess, resumeDoc
 
   const handleConfirmAndSave = async () => {
     if (!policyData.policyNumber?.trim()) {
-      addToast('Policy Number is required', 'warning');
+      addToast('Policy Number is required before saving. Please enter the policy number.', 'warning');
       setActiveTab('policy');
       return;
     }
     if (!policyData.finalPremium && !policyData.premium) {
-      addToast('Total Premium is required', 'warning');
+      addToast('Total Premium is required before saving. Please enter the premium amount.', 'warning');
       setActiveTab('premium');
       return;
     }
     if (selectedCustomerAction === 'create_new' && (!customerData.name?.trim() || !customerData.mobile?.trim())) {
-      addToast('Customer Name and 10-digit Mobile are required', 'warning');
+      addToast('Customer Name and 10-digit Mobile are required before saving. Check Customer Info tab.', 'warning');
       setActiveTab('customer');
       return;
     }
@@ -967,7 +967,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess, resumeDoc
       {/* STEP 3: Split Human Review Interface */}
       {/* ------------------------------------------------------------- */}
       {step === 'review' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '75vh', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           
           {/* Classification & Subtype Banner */}
           <div style={{
@@ -1029,6 +1029,26 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess, resumeDoc
                   Change Subtype
                 </button>
               )}
+
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={isConfirming}
+                onClick={handleConfirmAndSave}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: 'var(--color-accent)',
+                  fontWeight: '700',
+                  fontSize: '12px',
+                  padding: '6px 14px',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}
+              >
+                <CheckCircle2 size={15} />
+                <span>{isConfirming ? 'Uploading Policy...' : 'Save & Upload Policy'}</span>
+              </button>
             </div>
           </div>
 
@@ -1140,7 +1160,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess, resumeDoc
           </div>
 
           {/* Split Desktop Layout: Left Document / Right Extracted Tabs */}
-          <div style={{ display: 'grid', gridTemplateColumns: '42% 58%', gap: '16px', flex: 1, minHeight: '480px', overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '42% 58%', gap: '16px', height: '560px', minHeight: '480px' }}>
             
             {/* Left: Document PDF Preview */}
             <div style={{
@@ -1187,7 +1207,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess, resumeDoc
             </div>
 
             {/* Right: Subtype-Specific Categorized Tabs & Form */}
-            <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: '#ffffff', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: '#ffffff', height: '100%', minHeight: 0, overflow: 'hidden' }}>
               
               {/* Category Tabs */}
               <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', overflowX: 'auto', gap: '2px' }}>
@@ -1232,7 +1252,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess, resumeDoc
               </div>
 
                 {/* Tab Form Content */}
-              <div style={{ flex: 1, padding: '16px', overflowY: 'auto' }}>
+              <div style={{ flex: 1, minHeight: 0, padding: '16px', overflowY: 'auto' }}>
                 
                 {/* 1. Customer Information */}
                 {activeTab === 'customer' && (
@@ -3383,7 +3403,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess, resumeDoc
               </div>
 
               {/* Review Action Footer */}
-              <div style={{ padding: '12px 16px', borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ flexShrink: 0, padding: '12px 16px', borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {Object.values(policyDocsToUpload).some(Boolean) ? (
                     <span style={{ color: '#15803d', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -3408,7 +3428,7 @@ export const PolicyPdfUploadModal = ({ isOpen, onClose, onSaveSuccess, resumeDoc
                     style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'var(--color-accent)' }}
                   >
                     <CheckCircle2 size={15} />
-                    <span>{isConfirming ? 'Creating Policy...' : 'Confirm & Create Policy'}</span>
+                    <span>{isConfirming ? 'Uploading Policy...' : 'Save & Upload Policy'}</span>
                   </button>
                 </div>
               </div>
